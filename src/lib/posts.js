@@ -136,6 +136,29 @@ export async function getPost(slug, lang = 'zh') {
   );
 }
 
+// 其它语言视图下「相邻文章」的展示标题：优先用该文章在目标语言下的已发布版本标题。
+// 背景：getAllPosts(lang) 里缺译文的条目会回退其它语言版本（中文原文兜底），
+// 于是英文/日文文章页的「上一篇 / 下一篇」会直接露出中文标题。这里在展示层做一次
+// 标题级回退：有译文用译文标题，无译文保持原文标题（不隐藏导航、不改变相邻关系）。
+// 相邻关系本身与语言无关，因此仅替换标题、不动顺序与链接。
+export function titleResolver(allRows, lang) {
+  const groups = new Map();
+  for (const p of allRows) {
+    const b = baseSlug(p.slug);
+    if (!groups.has(b)) groups.set(b, []);
+    groups.get(b).push(p);
+  }
+  return function displayTitle(p) {
+    const group = groups.get(baseSlug(p.slug));
+    if (!group || (p.lang || 'zh') === lang) return p.title;
+    const dl = pickDisplayLang(group, baseSlug(p.slug), lang);
+    // 回退仅为缺失译文兜底：显示语言仍等于该条自身语言时无需替换
+    if (!dl || dl === (p.lang || 'zh')) return p.title;
+    const picked = pickLangVersion(group, dl);
+    return (picked && picked.title) || p.title;
+  };
+}
+
 // 文章组内某语言「有已发布译文」的判定（兼容双约定）：
 //   · 外语：lang 字段匹配，或 slug 为 base-语言（后台未设语言时 lang 常为默认 'zh'）
 //   · 中文：只认 base slug 且 lang 为 zh（不能靠 lang 字段——后缀约定的英文版 lang 也是 'zh'）

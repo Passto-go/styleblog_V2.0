@@ -71,6 +71,9 @@ export const ui = {
     'post.catDir': '分类目录',
     'post.words': '约 {n} 字',
     'post.readTime': '约 {n} 分钟读完',
+    'post.prev': '← 上一篇',
+    'post.next': '下一篇 →',
+    'post.navLabel': '上一篇 / 下一篇',
 
     'share.title': '分享这篇文章',
     'share.copy': '复制链接',
@@ -195,6 +198,9 @@ export const ui = {
     'post.catDir': 'Categories',
     'post.words': '~{n} words',
     'post.readTime': '~{n} min read',
+    'post.prev': '← Previous',
+    'post.next': 'Next →',
+    'post.navLabel': 'Previous / Next post',
 
     'share.title': 'Share this post',
     'share.copy': 'Copy link',
@@ -319,6 +325,9 @@ export const ui = {
     'post.catDir': 'カテゴリ',
     'post.words': '約 {n} 文字',
     'post.readTime': '約 {n} 分で読めます',
+    'post.prev': '← 前の記事',
+    'post.next': '次の記事 →',
+    'post.navLabel': '前の記事 / 次の記事',
 
     'share.title': 'この記事をシェア',
     'share.copy': 'リンクをコピー',

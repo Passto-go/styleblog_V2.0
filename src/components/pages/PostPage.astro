@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getAllPosts, getCategories, toCategoryMap, getAvatar, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
+import { getAllPosts, getAllPostsEveryLang, titleResolver, getCategories, toCategoryMap, getAvatar, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
 import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import { readingMinutes } from '../../lib/reading-time.js';
@@ -17,8 +17,11 @@ const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
 const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlug}/`, lang) : null;
 
-// 上下篇导航：按当前语言取列表（每篇只含该语言版本），避免跳到另一语言的同名文章
+// 上下篇导航：相邻关系按「当前语言视图」的文章顺序取（每篇只含该语言最匹配的版本），
+// 避免跳到另一语言的同名文章；标题则用该文章在目标语言下的译文（无译文才保留原文），
+// 否则英文/日文页会直接露出中文标题。
 const allPosts = await getAllPosts(lang);
+const displayTitle = titleResolver(await getAllPostsEveryLang(), lang);
 // 分类名以注册表为准：按 post.category_slug 反查当前语言名称，缺行才回退中文快照
 const cats = await getCategories(lang, { skipPosts: true });
 const catMap = toCategoryMap(cats);
@@ -120,17 +123,17 @@ const missingNotice = (() => {
   </div>
 
   {(prevPost || nextPost) && (
-    <nav class="post-nav" aria-label="上一篇 / 下一篇">
+    <nav class="post-nav" aria-label={t('post.navLabel')}>
       {prevPost ? (
         <a class="post-nav-item prev" href={localizePath(`/posts/${prevPost.slug}/`, lang)}>
-          <span class="post-nav-dir">← 上一篇</span>
-          <span class="post-nav-title">{prevPost.title}</span>
+          <span class="post-nav-dir">{t('post.prev')}</span>
+          <span class="post-nav-title">{displayTitle(prevPost)}</span>
         </a>
       ) : <span class="post-nav-item prev disabled"></span>}
       {nextPost ? (
         <a class="post-nav-item next" href={localizePath(`/posts/${nextPost.slug}/`, lang)}>
-          <span class="post-nav-dir">下一篇 →</span>
-          <span class="post-nav-title">{nextPost.title}</span>
+          <span class="post-nav-dir">{t('post.next')}</span>
+          <span class="post-nav-title">{displayTitle(nextPost)}</span>
         </a>
       ) : <span class="post-nav-item next disabled"></span>}
     </nav>
