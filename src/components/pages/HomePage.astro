@@ -4,7 +4,7 @@ import PostCard from '../PostCard.astro';
 import ProfileCard from '../ProfileCard.astro';
 import TodayQuote from '../TodayQuote.astro';
 import Countdown from '../Countdown.astro';
-import { getPosts, getCategories, toCategoryMap } from '../../lib/posts.js';
+import { getPosts, getCategories, toCategoryMap, getAvatar } from '../../lib/posts.js';
 import { useTranslations } from '../../i18n/ui.js';
 
 const { lang } = Astro.props;
@@ -12,11 +12,13 @@ const t = useTranslations(lang);
 const posts = await getPosts(lang);
 const cats = await getCategories(lang);
 const catMap = toCategoryMap(cats);
+// 头像：后台设置优先，未配置回退源码里的 /avatar.png
+const avatar = await getAvatar();
 ---
 <Base lang={lang} title={t('home.hero.title')} description={t('site.tagline')}>
   <div class="home">
     <aside class="sidebar">
-      <ProfileCard lang={lang} postsCount={posts.length} catsCount={cats.length} />
+      <ProfileCard lang={lang} postsCount={posts.length} catsCount={cats.length} avatar={avatar} />
       <TodayQuote lang={lang} />
       <Countdown lang={lang} />
     </aside>

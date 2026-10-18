@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getAllPosts, getCategories, toCategoryMap, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
+import { getAllPosts, getCategories, toCategoryMap, getAvatar, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
 import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import { readingMinutes } from '../../lib/reading-time.js';
@@ -23,6 +23,7 @@ const allPosts = await getAllPosts(lang);
 const cats = await getCategories(lang, { skipPosts: true });
 const catMap = toCategoryMap(cats);
 const postCatName = catMap.get(post.categorySlug)?.name || post.category;
+const avatar = await getAvatar();
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const readMinutes = readingMinutes(post.content);
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
@@ -94,7 +95,7 @@ const missingNotice = (() => {
   <div class="post-layout">
     <aside class="post-aside post-aside-left">
       <Toc headings={headings} lang={lang} />
-      <ProfileCard lang={lang} postsCount={allPosts.length} catsCount={cats.length} />
+      <ProfileCard lang={lang} postsCount={allPosts.length} catsCount={cats.length} avatar={avatar} />
       <TodayQuote lang={lang} />
       <Countdown lang={lang} />
     </aside>

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { marked } from 'marked';
 import { samplePosts } from '../data/sample.js';
+import { site } from '../data/site.js';
 
 const URL = import.meta.env.PUBLIC_SUPABASE_URL;
 const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
@@ -185,10 +186,15 @@ export async function getPostWithVersions(slug, lang = 'zh') {
 }
 
 // 读取站点动态配置（如倒计时）。表不存在 / 未配置时返回 null，调用方回退默认值。
-export async function getSetting(key) {
+// noStore：跳过 fetch 缓存。后台「保存后立即看效果」的场景要传 true，
+// 否则 fetch 层缓存会把旧值再喂回来。
+export async function getSetting(key, opts = {}) {
   if (!URL || !KEY) return null;
   try {
-    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const supabase = createClient(URL, KEY, {
+      auth: { persistSession: false },
+      global: opts.noStore ? { fetch: (u, i) => fetch(u, { ...i, cache: 'no-store' }) } : {},
+    });
     const { data, error } = await supabase
       .from('site_settings')
       .select('value')
@@ -200,6 +206,27 @@ export async function getSetting(key) {
     return null;
   }
 }
+
+// 站点头像地址（后台「站点设置 → 头像」上传后存 site_settings.avatar）。
+// 未配置 / 读取失败 / 上传通道未就绪时，回退源码里的 site.avatar（public/avatar.png），
+// 保证头像永远有内容可渲染：读取失败绝不能把线上头像弄丢。
+const AVATAR_FALLBACK = site.avatar || '';
+export async function getAvatar(opts = {}) {
+  const v = await getSetting('avatar', opts);
+  const url = v && typeof v === 'object' ? String(v.url || '').trim() : '';
+  if (!url) return AVATAR_FALLBACK;
+  // 只接受 http(s) 与「站内单斜杠绝对路径」。
+  // 注意：不能写成 /^\/，//evil.com/a.png 也以 / 开头，但浏览器会当成协议相对外链；
+  // 这里要求 / 后面不是 /，把跨域 svg/data/javascript 之类的脏值统统挡在外面。
+  if (!/^(https?:\/\/|\/(?!\/))/i.test(url)) return AVATAR_FALLBACK;
+  return url;
+}
+
+// 资料卡头像加载失败时的兜底字（与源码配置一致）
+export function avatarFallbackChar() {
+  return (site.avatarFallback || (site.author || 'A').slice(0, 1) || 'A');
+}
+export { site as siteConfig };
 
 // 分类列表（含每类文章数）。
 // 以 categories 注册表为「名称/Slug 权威源」，叠加已发布文章的实际计数；

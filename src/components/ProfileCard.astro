@@ -1,9 +1,10 @@
 ---
 import Icon from './Icon.astro';
 import { site } from '../data/site.js';
+import { getAvatar } from '../lib/posts.js';
 import { useTranslations, localizePath } from '../i18n/ui.js';
 
-const { lang = 'zh', postsCount = 0, catsCount = 0 } = Astro.props;
+const { lang = 'zh', postsCount = 0, catsCount = 0, avatar = null } = Astro.props;
 const t = useTranslations(lang);
 const L = (p) => localizePath(p, lang);
 const socials = site.socials.filter((s) => s.url);
@@ -11,11 +12,14 @@ const stats = [
   { num: postsCount, lbl: t('profile.posts'), href: L('/archive/') },
   { num: catsCount, lbl: t('profile.categories'), href: L('/categories/') },
 ];
+// 头像：后台「站点设置 → 头像」上传的值优先，未配置则回退 public/avatar.png。
+// 父页面已取过可直接传入，避免同一请求内重复读库。
+const avatarSrc = avatar !== null ? avatar : await getAvatar();
 ---
 <aside class="profile-card">
   <div class="profile-avatar">
     <span class="avatar-fallback">{site.avatarFallback}</span>
-    {site.avatar && <img src={site.avatar} alt={site.author} onerror="this.remove()" />}
+    {avatarSrc && <img src={avatarSrc} alt={site.author} onerror="this.remove()" />}
   </div>
   <h3 class="profile-name">{site.author}</h3>
   <p class="profile-tagline">{site.tagline}</p>
