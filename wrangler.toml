@@ -13,12 +13,19 @@ account_id = "2cc5e3ce9320936d151487ce230e8344"
 directory = "./dist"
 
 # 一键翻译（后台 /api/translate 调用）：走 OpenAI 兼容端点，当前指向智谱 GLM
-# （GLM-4.7-Flash 为模型级永久免费，个人博客用量足够；换服务只改下面两个值即可，
+# 模型选择 glm-4-flash（非推理型）。换服务只改下面两个值即可，
 #  代码零改动——任何 OpenAI 兼容服务均可，如 DeepSeek / Moonshot / Gemini）。
+#
+# 为什么不用 glm-4.7-flash（2026-10-18 实测）：
+#   4.7-flash 属推理型，max_tokens 是「思考 + 回答」共享预算。中文→英文时
+#   思考 8.5k 字刚好留够答案；中文→日文思考量涨到 2 万～5 万字，8192 预算
+#   连答案开头都写不出，翻倍重试三次全被耗尽 → 翻译直接失败。
+#   glm-4-flash 无 reasoning 消耗，英/日实测均一次通过（日文 19.4s）。
+#   另：4.7-flash 高峰常返 429 / code 1305（该模型访问量过大）。
 # TRANSLATE_API_KEY 是敏感项，不写在本文件：
 #   Cloudflare 后台 → 本项目 → Settings → Variables and Secrets
 #   → Add → Type 选 Secret → Name: TRANSLATE_API_KEY → Value: 智谱 API key
 #   → 保存后 Deployments 里 Retry deployment 生效（secret 仅在服务端可见，不会下发浏览器）。
 [vars]
 TRANSLATE_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
-TRANSLATE_MODEL = "glm-4.7-flash"
+TRANSLATE_MODEL = "glm-4-flash"
