@@ -167,7 +167,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
           </div>
           <p class="wb-hint wb-cat-note">
             这里管理所有已上传的图片与附件。删除文章时会自动清理其名下文件；
-            「孤儿文件」指已上传但没有任何文章引用它们（含上传后未插入正文的情况），可一键清理。
+            「孤儿文件」指已上传但没有任何文章引用它们——正文与封面都算引用（仅设为封面、未插入正文的文件不是孤儿），可一键清理。
           </p>
 
           <div class="wb-fm-actions">
@@ -994,20 +994,15 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     }
     allMedia = data || [];
 
-    // 2) 读孤儿清单（视图 media_orphans；失败则降级为「按正文引用即时判定」）
-    try {
-      const { data: orph } = await supabase.from('media_orphans').select('path');
-      orphanPaths = new Set((orph || []).map((x) => x.path));
-    } catch {
-      const { data: posts } = await supabase.from('posts').select('content');
-      const blob = (posts || []).map((p) => p.content || '').join('\n');
+    // 2) 孤儿判定：以「正文 + 封面」即时引用为准，不依赖 media_orphans 视图
+    //    口径：posts.content 或 posts.cover 任一包含该 path 即非孤儿。
+    //    历史上视图只查 content，会把「仅设为封面、未插入正文」的图误判为孤儿，
+    //    后台一键清理即误删（2026-10-18 修复：前端改为自行判定，与视图解耦，
+    //    旧视图即便未更新也不会造成误判；media_library.sql 中的视图定义已同步修正）
+    {
+      const { data: posts } = await supabase.from('posts').select('content,cover');
+      const blob = (posts || []).map((p) => (p.content || '') + '\n' + (p.cover || '')).join('\n');
       orphanPaths = new Set(allMedia.filter((m) => !blob.includes(m.path)).map((m) => m.path));
-    }
-    // 视图可能因「media 无记录但 storage 有文件」而漏判，补一轮正文引用核对
-    if (allMedia.length) {
-      const { data: posts } = await supabase.from('posts').select('content');
-      const blob = (posts || []).map((p) => p.content || '').join('\n');
-      allMedia.forEach((m) => { if (!blob.includes(m.path)) orphanPaths.add(m.path); });
     }
     renderMedia();
   }
@@ -1101,12 +1096,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     });
   }
 
-  // 清理孤儿文件：仅删「media 有记录、正文无引用」的文件，逐个尝试，最后汇总
+  // 清理孤儿文件：仅删「media 有记录、正文与封面均无引用」的文件，逐个尝试，最后汇总
   async function cleanOrphans() {
     const msg = $('fm-msg');
     const list = allMedia.filter((m) => orphanPaths.has(m.path));
     if (!list.length) { msg.textContent = '没有孤儿文件 ✓'; return; }
-    if (!confirm(`清理 ${list.length} 个孤儿文件？\n它们未被任何文章引用，删除不可恢复。`)) return;
+    if (!confirm(`清理 ${list.length} 个孤儿文件？\n它们未被任何文章的正文或封面引用，删除不可恢复。`)) return;
     msg.textContent = '清理中…';
     let done = 0, fail = 0;
     for (const m of list) {
