@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getAllPosts, getAllPostsEveryLang, titleResolver, getCategories, toCategoryMap, getAvatar, renderMarkdown, findTranslation, baseSlug } from '../../lib/posts.js';
+import { getAllPosts, getAllPostsEveryLang, titleResolver, getCategories, toCategoryMap, getAvatar, renderMarkdown, findTranslation, baseSlug, getAttachments } from '../../lib/posts.js';
 import { useTranslations, localizePath, languages } from '../../i18n/ui.js';
 import { formatDate } from '../../lib/format.js';
 import { readingMinutes } from '../../lib/reading-time.js';
@@ -34,6 +34,8 @@ const pagePath = localizePath(`/posts/${post.slug}/`, lang);
 // 基准 slug（去掉 -en/-ja 语言后缀）：用于给正文容器打「文章身份」标记，
 // 使仅针对某一篇文章的样式规则在它的所有语言版本上一致生效。
 const postBaseSlug = baseSlug(post.slug);
+// 文章附件：统一展示在正文底部「附件」区，仅文件名 + 下载链接，不进正文、无预览/大小
+const attachments = await getAttachments(postBaseSlug);
 // 分享需要绝对地址（社交平台不接受相对路径）
 const shareUrl = Astro.site ? new URL(pagePath, Astro.site).href : pagePath;
 const prevPost = idx > 0 ? allPosts[idx - 1] : null;
@@ -117,6 +119,18 @@ const missingNotice = (() => {
       <Share lang={lang} url={shareUrl} title={post.title} />
       <Comments lang={lang} page={pagePath} />
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
+      {attachments.length > 0 && (
+        <section class="post-attachments" aria-label={t('post.attachments')}>
+          <h2 class="post-attachments-title">{t('post.attachments')}</h2>
+          <ul class="post-attachments-list">
+            {attachments.map((a) => (
+              <li>
+                <a href={a.url} download={a.name} target="_blank" rel="noopener">{a.name}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </article>
   </div>
 

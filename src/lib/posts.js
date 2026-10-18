@@ -410,3 +410,27 @@ export function renderMarkdown(content = '') {
   });
   return { html, headings };
 }
+
+// 文章附件：从 post_attachments 视图读取「已发布文章」的附件（SSR 渲染时调用）。
+// 视图仅暴露已发布文章（草稿/私密不泄露），且匿名可读；失败或环境缺失时回退空数组。
+// path 以时间戳前缀命名，故按 path 升序即上传 chronological 顺序，无需额外排序字段。
+export async function getAttachments(baseSlug) {
+  if (!URL || !KEY || !baseSlug) return [];
+  try {
+    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const { data, error } = await supabase
+      .from('post_attachments')
+      .select('path, original_name, mime, size_bytes')
+      .eq('post_slug', baseSlug)
+      .order('path', { ascending: true });
+    if (error || !data) return [];
+    return (data || []).map((m) => ({
+      name: m.original_name || m.path,
+      url: supabase.storage.from('attachments').getPublicUrl(m.path).data.publicUrl,
+      path: m.path,
+      mime: m.mime || '',
+    }));
+  } catch {
+    return [];
+  }
+}

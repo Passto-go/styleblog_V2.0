@@ -74,6 +74,7 @@ export const ui = {
     'post.prev': '← 上一篇',
     'post.next': '下一篇 →',
     'post.navLabel': '上一篇 / 下一篇',
+    'post.attachments': '附件',
 
     'share.title': '分享这篇文章',
     'share.copy': '复制链接',
@@ -201,6 +202,7 @@ export const ui = {
     'post.prev': '← Previous',
     'post.next': 'Next →',
     'post.navLabel': 'Previous / Next post',
+    'post.attachments': 'Attachments',
 
     'share.title': 'Share this post',
     'share.copy': 'Copy link',
@@ -328,6 +330,7 @@ export const ui = {
     'post.prev': '← 前の記事',
     'post.next': '次の記事 →',
     'post.navLabel': '前の記事 / 次の記事',
+    'post.attachments': '添付ファイル',
 
     'share.title': 'この記事をシェア',
     'share.copy': 'リンクをコピー',

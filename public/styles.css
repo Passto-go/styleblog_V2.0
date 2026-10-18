@@ -591,6 +591,14 @@ a { color: inherit; }
 }
 .wb-upload:hover { border-color: var(--accent); background: var(--accent-soft); }
 
+/* 附件面板（编辑器内）：列表 + 删除 */
+.wb-attach-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wb-attach-list li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.wb-attach-list a { color: var(--accent); text-decoration: none; word-break: break-all; }
+.wb-attach-list a:hover { text-decoration: underline; }
+.wb-attach-del { cursor: pointer; font-size: 12px; color: var(--danger, #c0392b); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; flex: none; }
+.wb-attach-del:hover { border-color: var(--danger, #c0392b); }
+
 /* 更多设置（折叠） */
 .wb-more { margin: 8px 0 4px; border-top: 1px solid var(--border); padding-top: 10px; }
 .wb-more summary { cursor: pointer; font-size: 13px; color: var(--muted); }
@@ -881,6 +889,16 @@ a { color: inherit; }
 }
 .translation-notice-text { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--text-strong); }
 .translation-notice-note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+/* 文章底部附件区：仅文件名 + 下载链接，无预览/大小 */
+.post-attachments {
+  margin-top: 30px; padding: 16px 18px;
+  border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface-2);
+}
+.post-attachments-title { font-size: 15px; margin: 0 0 10px; color: var(--text-strong); }
+.post-attachments-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.post-attachments-list a { font-size: 14px; color: var(--accent); text-decoration: none; word-break: break-all; }
+.post-attachments-list a:hover { text-decoration: underline; }
 .translation-notice-link { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--accent); }
 .translation-notice-link:hover { text-decoration: underline; }
 /* 正文排版（对齐 GitHub markdown-body 文档风） */

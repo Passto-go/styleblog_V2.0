@@ -128,6 +128,19 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                 </div>
               </details>
 
+              <details class="wb-more" id="attach-details">
+                <summary>附件（显示在文章底部，可下载，不进正文）</summary>
+                <div class="wb-more-body">
+                  <label class="wb-upload wb-upload-att" title="上传文件作为文章附件，展示在正文页底部，仅显示文件名、点击下载">
+                    上传附件
+                    <input id="f-attach" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip,image/*" multiple hidden />
+                  </label>
+                  <span id="attach-msg" class="wb-hint"></span>
+                  <ul id="attach-list" class="wb-attach-list"></ul>
+                  <small class="wb-hint">附件出现在正文页底部「附件」区，仅显示文件名、点击下载；与正文插图互不干扰。保存文章后此处才会列出该文的附件。</small>
+                </div>
+              </details>
+
               <div class="wb-actions">
                 <button id="save-draft-btn" class="btn btn-ghost" type="button">存草稿</button>
                 <button id="publish-btn" class="btn" type="button">发布并上线</button>
@@ -1830,6 +1843,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     setMsg('');
     renderPreview();
     updateSlugHint();
+    refreshAttachList(); // 载入文章后回填附件面板
     updateLangState();
     state.dirty = false; // 刚载入的行视为「无未保存改动」
     // 提示行与当前版本对齐：仅当它已过期（换了 id 或语言）才重算，
@@ -2589,31 +2603,95 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     } catch (e) { console.warn('[admin] media 记录写入失败（不影响上传）', e); }
   }
 
-  // 上传：图片插 Markdown 图片语法，附件插下载链接。均记录归属。
+  // 上传单个文件到指定 bucket（默认按扩展名自动分流；附件面板可强制 attachments 桶）。
+  // 上传后登记 media 归属。返回 { bucket, isImg, path, publicUrl }。
+  async function uploadOne(file, forceBucket) {
+    const bucket = forceBucket || bucketFor(file.name);
+    const isImg = bucket === 'images';
+    const path = safeUploadPath(file.name, isImg);
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, { upsert: true, contentType: file.type || undefined });
+    if (error) throw error;
+    const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+    await recordMedia({ path, bucket, originalName: file.name, mime: file.type, size: file.size });
+    return { bucket, isImg, path, publicUrl };
+  }
+
+  // 「插入文件」：图片插入正文（Markdown 图片语法）；非图片不再塞进正文，
+  // 而是作为附件登记（进入正文页底部「附件」区），避免正文被下载链接污染。
   async function uploadImages(files) {
     const msg = $('upload-msg');
     const imgs = [];
-    const atts = [];
     for (const file of files) {
-      const bucket = bucketFor(file.name);
-      const isImg = bucket === 'images';
       msg.textContent = `上传中 ${file.name}…`;
-      const path = safeUploadPath(file.name, isImg);
-      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type || undefined });
-      if (error) { msg.textContent = '上传失败：' + error.message; return; }
-      const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-      await recordMedia({ path, bucket, originalName: file.name, mime: file.type, size: file.size });
-      if (isImg) imgs.push(`![](${publicUrl})`);
-      else atts.push(`[📎 ${file.name}](${publicUrl})`);
+      try {
+        const r = await uploadOne(file);
+        if (r.isImg) imgs.push(`![](${r.publicUrl})`);
+        else msg.textContent = `「${file.name}」已作为附件（显示在文章底部，不插入正文）✓`;
+      } catch (e) {
+        msg.textContent = '上传失败：' + e.message;
+        return;
+      }
     }
-    const parts = [...imgs, ...atts];
-    if (parts.length) {
-      insertAtCursor(parts.join('\n'));
-      const bits = [];
-      if (imgs.length) bits.push(`${imgs.length} 张图片`);
-      if (atts.length) bits.push(`${atts.length} 个附件`);
-      msg.textContent = `已插入 ${bits.join(' + ')} ✓`;
+    if (imgs.length) {
+      insertAtCursor(imgs.join('\n'));
+      msg.textContent = `已插入 ${imgs.length} 张图片 ✓`;
     }
+    await refreshAttachList();
+  }
+
+  // 附件面板：上传到 attachments 桶（无论图片/文档），刷新列表。不触碰正文。
+  async function uploadAttachment(files) {
+    const msg = $('attach-msg');
+    for (const file of files) {
+      msg.textContent = `上传中 ${file.name}…`;
+      try {
+        await uploadOne(file, 'attachments');
+      } catch (e) {
+        msg.textContent = '上传失败：' + e.message;
+        return;
+      }
+    }
+    msg.textContent = '已上传 ✓';
+    await refreshAttachList();
+  }
+
+  // 刷新附件列表（后台用登录态读 media，非公开视图）。
+  async function refreshAttachList() {
+    const ul = $('attach-list');
+    if (!ul) return;
+    const base = state.slug ? baseSlug(state.slug) : null;
+    if (!base) { ul.innerHTML = '<li class="wb-hint">保存文章后可管理附件</li>'; return; }
+    const { data, error } = await supabase
+      .from('media')
+      .select('path, original_name, mime')
+      .eq('post_slug', base)
+      .eq('bucket', 'attachments')
+      .order('created_at', { ascending: true });
+    if (error) { ul.innerHTML = ''; return; }
+    if (!data || !data.length) { ul.innerHTML = '<li class="wb-hint">暂无附件</li>'; return; }
+    ul.innerHTML = '';
+    for (const m of data) {
+      const url = supabase.storage.from('attachments').getPublicUrl(m.path).data.publicUrl;
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(m.original_name || m.path)}</a>`;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'wb-attach-del';
+      del.textContent = '删除';
+      del.onclick = () => removeAttachment(m.path);
+      li.appendChild(del);
+      ul.appendChild(li);
+    }
+  }
+
+  // 删除单个附件：清 storage 对象 + media 记录，再刷新列表。
+  async function removeAttachment(path) {
+    if (!confirm('删除该附件？此操作不可恢复。')) return;
+    await supabase.storage.from('attachments').remove([path]).catch(() => {});
+    await supabase.from('media').delete().eq('path', path).catch(() => {});
+    await refreshAttachList();
   }
 
   function insertAtCursor(text) {
@@ -2850,6 +2928,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     // 图片上传
     $('f-image').addEventListener('change', (e) => {
       if (e.target.files?.length) uploadImages([...e.target.files]);
+      e.target.value = '';
+    });
+
+    // 附件上传（独立面板，不进正文）
+    $('f-attach').addEventListener('change', (e) => {
+      if (e.target.files?.length) uploadAttachment([...e.target.files]);
       e.target.value = '';
     });
 
