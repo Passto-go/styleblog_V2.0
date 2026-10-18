@@ -116,9 +116,6 @@ const missingNotice = (() => {
       {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
       {/* data-post：暴露文章基准 slug，供「仅对指定文章生效」的样式/脚本作用域钩子使用 */}
       <div class="content" data-post={postBaseSlug} set:html={html} />
-      <Share lang={lang} url={shareUrl} title={post.title} />
-      <Comments lang={lang} page={pagePath} />
-      <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
       {attachments.length > 0 && (
         <section class="post-attachments" aria-label={t('post.attachments')}>
           <h2 class="post-attachments-title">{t('post.attachments')}</h2>
@@ -131,6 +128,9 @@ const missingNotice = (() => {
           </ul>
         </section>
       )}
+      <Share lang={lang} url={shareUrl} title={post.title} />
+      <Comments lang={lang} page={pagePath} />
+      <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
     </article>
   </div>
 

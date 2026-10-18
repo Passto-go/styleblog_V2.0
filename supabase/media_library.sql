@@ -126,9 +126,36 @@ where not (
 -- 视图本身不设 RLS；底层 media 已限登录用户，故匿名读不到内容
 grant select on media_orphans to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- 5) 文章附件公开视图：供正文页 SSR 渲染「底部附件区」读取（匿名可读）
+--    只暴露「已发布且未入垃圾箱」文章的附件——草稿附件不外泄。
+--    用 EXISTS 而非 JOIN：同一篇文章的多语言版本（base / base-en / base-ja）
+--    都满足匹配，JOIN 会让同一附件重复出现 N 次（N=已发布语言版本数），
+--    前台附件区随之重复渲染；EXISTS 只判断「存在」，每条 media 行至多出一行。
+--    post_slug 与视图匹配均用「基准 slug」（去掉 -en/-ja 后缀），多语言共享附件。
+-- ---------------------------------------------------------------------------
+create or replace view post_attachments as
+select
+  m.path,
+  m.original_name,
+  m.mime,
+  m.size_bytes,
+  m.post_slug
+from media m
+where m.bucket = 'attachments'
+  and exists (
+    select 1 from posts p
+    where regexp_replace(p.slug, '-(en|ja)$', '') = m.post_slug
+      and p.published = true
+      and p.deleted_at is null
+  );
+
+grant select on post_attachments to anon;
+
 -- ============================================================================
 -- 自查（可选）：
 --   select count(*) from media;
 --   select * from media_orphans limit 20;
+--   select * from post_attachments limit 20;
 --   select id, public from storage.buckets where id in ('images','attachments');
 -- ============================================================================

@@ -96,11 +96,16 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </div>
 
               <div class="wb-toolbar">
-                <label class="wb-upload" title="上传图片插入正文，或上传附件（Word/PPT/Excel/PDF 等）插入下载链接">
-                  插入文件
-                  <input id="f-image" type="file" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip" multiple hidden />
+                <label class="wb-upload" title="上传图片插入正文（正文插图）">
+                  插入图片
+                  <input id="f-image" type="file" accept="image/*" multiple hidden />
+                </label>
+                <label class="wb-upload wb-upload-att" title="上传文件作为文章附件：展示在正文页底部「附件」区，仅文件名、点击下载，不进正文">
+                  上传附件
+                  <input id="f-attach" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip,image/*" multiple hidden />
                 </label>
                 <span id="upload-msg" class="wb-hint"></span>
+                <span id="attach-msg" class="wb-hint"></span>
               </div>
 
               <div class="wb-trbar">
@@ -131,13 +136,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               <details class="wb-more" id="attach-details">
                 <summary>附件（显示在文章底部，可下载，不进正文）</summary>
                 <div class="wb-more-body">
-                  <label class="wb-upload wb-upload-att" title="上传文件作为文章附件，展示在正文页底部，仅显示文件名、点击下载">
-                    上传附件
-                    <input id="f-attach" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip,image/*" multiple hidden />
-                  </label>
-                  <span id="attach-msg" class="wb-hint"></span>
                   <ul id="attach-list" class="wb-attach-list"></ul>
-                  <small class="wb-hint">附件出现在正文页底部「附件」区，仅显示文件名、点击下载；与正文插图互不干扰。保存文章后此处才会列出该文的附件。</small>
+                  <small class="wb-hint">用工具栏「上传附件」添加；附件出现在正文页底部「附件」区，仅显示文件名、点击下载，与正文插图互不干扰。保存文章后此处才会列出该文的附件。</small>
                 </div>
               </details>
 
