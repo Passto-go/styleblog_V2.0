@@ -246,6 +246,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               <div class="wb-side-head">
                 <strong>头像</strong>
                 <span id="avatar-src" class="wb-hint"></span>
+                <button id="avatar-hist-btn" class="wb-avatar-hist-btn" type="button"
+                        aria-expanded="false" aria-controls="avatar-hist-panel">
+                  历史头像 <span id="avatar-hist-n">(0)</span>
+                  <span class="wb-avatar-hist-arrow" aria-hidden="true">⌄</span>
+                </button>
               </div>
               <p class="wb-hint wb-cat-note">显示在首页与文章页的资料卡上。支持 PNG / JPG / WebP / GIF，单张不超过 2 MB；建议正方形（如 512×512），非正方形会自动居中裁切。</p>
               <div class="wb-avatar-row">
@@ -260,6 +265,21 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </div>
               <input id="avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
               <div id="avatar-msg" class="wb-hint" role="status" aria-live="polite"></div>
+
+              <!-- 历史头像（默认收起；高度+透明度过渡，见 styles.css .wb-avatar-hist-panel） -->
+              <div id="avatar-hist-panel" class="wb-avatar-hist-panel" hidden>
+                <div class="wb-avatar-hist-inner">
+                  <div class="wb-avatar-hist-head">
+                    <strong>历史头像</strong>
+                    <span class="wb-hint">单击放大预览，双击切换为当前头像</span>
+                  </div>
+                  <div id="avatar-hist-grid" class="wb-avatar-hist-grid"></div>
+                  <div class="wb-avatar-hist-foot">
+                    <span id="avatar-hist-stat" class="wb-hint"></span>
+                    <button id="avatar-hist-clear" class="wb-avatar-hist-clear" type="button">清空历史</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -431,17 +451,26 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // ---------- 站点设置 → 头像 ----------
-  // 存储：Supabase Storage 公开桶 avatars + site_settings 键 avatar（{ url, path, updated_at }）。
+  // 存储：Supabase Storage 公开桶 avatars + site_settings 键 avatar（{ url, path, updated_at, history }）。
   // 前台 SSR 每请求读 site_settings（getAvatar），所以保存后刷新前台立刻生效，无需发版。
   // 双写顺序刻意如此：先传文件 → 再写设置。写设置失败时只回滚刚传的新文件，
   // 绝不删除旧头像——宁可留着无用文件，也不能让线上头像变空。
+  //
+  // 历史头像：value.history 数组按时间倒序，history[0] 恒等于当前头像。
+  // 上传新图不再删旧图（改为归档）；仅两种删除：超上限裁掉最旧的、用户点「清空历史」。
   const AVATAR_BUCKET = 'avatars';
   const AVATAR_MAX_BYTES = 2 * 1024 * 1024;          // 2 MB
+  const AVATAR_HISTORY_MAX = 12;                     // 历史最多保留 12 张（含当前）
+  const AVATAR_CLICK_DELAY = 250;                    // 单击延迟，用于与双击区分
   const AVATAR_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
   const AVATAR_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
   const AVATAR_FALLBACK_SRC = site.avatar || '';
   let avatarState = { url: '', path: '' };            // 当前生效头像（来自 site_settings）
+  let avatarHistory = [];                            // [{ url, path, size, name, uploaded_at }]
   let avatarBusy = false;
+  let avatarHistOpen = false;                        // 本次会话的展开状态（刷新后回到收起）
+  let clickTimer = null;                             // 单击/双击判定计时器
+  let previewOverlay = null;                         // 放大预览浮层（单例）
 
   function setAvatarMsg(text, kind = '') {
     const el = $('avatar-msg');
@@ -467,6 +496,210 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     box.appendChild(img);
   }
 
+  // ---------- 历史头像：数据规整 ----------
+  // 老数据没有 history 字段、或字段被手工改坏时，一律当空数组处理，绝不抛错。
+  function normalizeHistory(v) {
+    const list = v && typeof v === 'object' && Array.isArray(v.history) ? v.history : [];
+    return list
+      .filter((it) => it && typeof it === 'object' && String(it.url || '').trim() && String(it.path || '').trim())
+      .map((it) => ({
+        url: String(it.url).trim(),
+        path: String(it.path).trim(),
+        size: Number(it.size) || 0,
+        name: String(it.name || ''),
+        uploaded_at: String(it.uploaded_at || ''),
+      }))
+      .sort((a, b) => String(b.uploaded_at).localeCompare(String(a.uploaded_at)));   // 时间倒序
+  }
+
+  // 把当前头像作为最新一条并入历史（用于兼容老数据：只有 url/path、没有 history 的情况）
+  function mergeCurrentIntoHistory(cur, hist) {
+    if (!cur || !cur.url || !cur.path) return hist;
+    const rest = hist.filter((h) => h.path !== cur.path);
+    return [{ url: cur.url, path: cur.path, size: Number(cur.size) || 0,
+              name: String(cur.name || ''), uploaded_at: String(cur.uploaded_at || '') }, ...rest];
+  }
+
+  function fmtStat(n, bytes) {
+    const kb = bytes / 1024;
+    const size = kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.round(kb)} KB`;
+    return `共 ${n} 张 · 占用 ${size}`;
+  }
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return ['--', '--:--'];
+    const p2 = (x) => String(x).padStart(2, '0');
+    return [`${p2(d.getMonth() + 1)}-${p2(d.getDate())}`, `${p2(d.getHours())}:${p2(d.getMinutes())}`];
+  }
+
+  // ---------- 历史头像：渲染 ----------
+  function renderAvatarHistory() {
+    const grid = $('avatar-hist-grid');
+    const btn = $('avatar-hist-btn');
+    if (!grid || !btn) return;
+    const n = avatarHistory.length;
+    $('avatar-hist-n').textContent = `(${n})`;
+    // 无历史：按钮禁用但不隐藏（避免按钮突然消失造成困惑）
+    btn.disabled = n === 0;
+    btn.title = n === 0 ? '还没有历史头像' : '展开/收起历史头像';
+    if (n === 0 && avatarHistOpen) toggleAvatarHistory(false);
+
+    grid.innerHTML = '';
+    avatarHistory.forEach((it, i) => {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'wb-avatar-hist-item' + (i === 0 ? ' is-current' : '');
+      cell.dataset.path = it.path;
+      cell.setAttribute('aria-label',
+        `历史头像 ${it.path}${i === 0 ? '（当前使用）' : ''}，单击预览，双击切换`);
+
+      const thumb = document.createElement('span');
+      thumb.className = 'wb-avatar-hist-thumb';
+      const img = document.createElement('img');
+      img.src = it.url;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.onerror = () => { thumb.classList.add('is-broken'); img.remove(); };
+      thumb.appendChild(img);
+      if (i === 0) {
+        const dot = document.createElement('span');
+        dot.className = 'wb-avatar-hist-dot';
+        dot.setAttribute('aria-hidden', 'true');
+        thumb.appendChild(dot);
+      }
+
+      const [date, time] = fmtTime(it.uploaded_at);
+      const meta = document.createElement('span');
+      meta.className = 'wb-avatar-hist-meta';
+      meta.innerHTML = `<span class="d">${date}</span><span class="t">${time}</span>`
+        + (i === 0 ? '<span class="cur">当前</span>' : '');
+
+      cell.appendChild(thumb);
+      cell.appendChild(meta);
+
+      // 单击延迟 250ms；期间来第二次点击则取消单击、执行双击。
+      cell.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; switchToAvatar(it); return; }
+        clickTimer = setTimeout(() => { clickTimer = null; openAvatarPreview(it); }, AVATAR_CLICK_DELAY);
+      });
+      grid.appendChild(cell);
+    });
+
+    const total = avatarHistory.reduce((s, it) => s + (Number(it.size) || 0), 0);
+    $('avatar-hist-stat').textContent = n ? fmtStat(n, total) : '还没有历史头像';
+    $('avatar-hist-clear').disabled = n <= 1;   // 只剩当前一张时无可清理
+  }
+
+  // ---------- 历史头像：展开/收起 ----------
+  function toggleAvatarHistory(force) {
+    const panel = $('avatar-hist-panel');
+    const btn = $('avatar-hist-btn');
+    if (!panel || !btn) return;
+    const open = typeof force === 'boolean' ? force : !avatarHistOpen;
+    avatarHistOpen = open;
+    btn.setAttribute('aria-expanded', String(open));
+    btn.classList.toggle('is-open', open);
+
+    if (open) {
+      panel.hidden = false;
+      // 先量出目标高度再过渡：0 → scrollHeight
+      panel.style.height = '0px';
+      panel.style.opacity = '0';
+      const h = panel.scrollHeight;
+      requestAnimationFrame(() => {
+        panel.style.height = h + 'px';
+        panel.style.opacity = '1';
+      });
+    } else {
+      panel.style.height = panel.scrollHeight + 'px';
+      requestAnimationFrame(() => {
+        panel.style.height = '0px';
+        panel.style.opacity = '0';
+      });
+      // 等过渡结束后再 hidden，避免过渡被 display:none 打断
+      setTimeout(() => { if (!avatarHistOpen) panel.hidden = true; }, 220);
+    }
+  }
+
+  // ---------- 历史头像：放大预览浮层 ----------
+  function openAvatarPreview(it) {
+    closeAvatarPreview();
+    const mask = document.createElement('div');
+    mask.className = 'wb-avatar-zoom';
+    mask.setAttribute('role', 'dialog');
+    mask.setAttribute('aria-modal', 'true');
+    mask.setAttribute('aria-label', '头像放大预览');
+
+    const box = document.createElement('div');
+    box.className = 'wb-avatar-zoom-box';
+    const img = document.createElement('img');
+    img.src = it.url;
+    img.alt = '头像放大预览';
+    const [date, time] = fmtTime(it.uploaded_at);
+    const cap = document.createElement('div');
+    cap.className = 'wb-avatar-zoom-cap';
+    cap.textContent = `${date} ${time}${it.path === avatarState.path ? ' · 当前使用' : ''}　（双击缩略图可切换为这张）`;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'wb-avatar-zoom-x';
+    x.setAttribute('aria-label', '关闭预览');
+    x.textContent = '✕';
+
+    box.appendChild(img);
+    box.appendChild(cap);
+    box.appendChild(x);
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+    previewOverlay = mask;
+
+    mask.addEventListener('click', (e) => { if (e.target === mask || e.target === x) closeAvatarPreview(); });
+    document.addEventListener('keydown', onAvatarZoomKey);
+    x.focus();
+  }
+
+  function onAvatarZoomKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); closeAvatarPreview(); }
+  }
+
+  function closeAvatarPreview() {
+    if (!previewOverlay) return;
+    previewOverlay.remove();
+    previewOverlay = null;
+    document.removeEventListener('keydown', onAvatarZoomKey);
+  }
+
+  // ---------- 历史头像：写回配置 ----------
+  // 统一走这里：url/path 跟随 history[0]，保证「配置」与「列表」永不脱节。
+  async function persistAvatar(history, newCurrent) {
+    const cur = newCurrent || history[0] || null;
+    const value = {
+      url: cur ? cur.url : '',
+      path: cur ? cur.path : '',
+      updated_at: new Date().toISOString(),
+      history,
+    };
+    if (cur) { value.size = cur.size; value.name = cur.name; value.uploaded_at = cur.uploaded_at; }
+    const { error } = await supabase.from('site_settings').upsert({
+      key: 'avatar', value, updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+    return value;
+  }
+
+  function applyAvatarValue(v) {
+    const cur = v && v.url ? { url: v.url, path: v.path } : { url: '', path: '' };
+    avatarState = cur;
+    avatarHistory = normalizeHistory(v);
+    if (v && v.url && v.path) avatarHistory = mergeCurrentIntoHistory(v, avatarHistory);
+    paintAvatarPreview(cur.url || AVATAR_FALLBACK_SRC);
+    $('avatar-src').textContent = cur.url ? '当前：已上传（存于 Storage）' : '当前：默认 /avatar.png';
+    $('avatar-remove').hidden = !cur.url;
+    renderAvatarHistory();
+  }
+
   async function readAvatarSetting() {
     // 与 loadCountdown 同款读法，直接走浏览器端的 supabase 客户端（始终实时，无快照缓存）
     try {
@@ -479,13 +712,66 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   async function loadAvatar() {
     const v = await readAvatarSetting();
-    const url = v && typeof v === 'object' ? String(v.url || '').trim() : '';
-    avatarState = { url, path: v && typeof v === 'object' ? String(v.path || '') : '' };
-    paintAvatarPreview(url || AVATAR_FALLBACK_SRC);
-    $('avatar-src').textContent = url ? '当前：已上传（存于 Storage）' : '当前：默认 /avatar.png';
-    $('avatar-remove').hidden = !url;
+    applyAvatarValue(v);
     $('avatar-file').textContent = '未选择文件';
     $('avatar-input').value = '';
+    // 展开态在本次会话内保持（切模块回来不重置）；首次进入为收起
+    if (avatarHistOpen && avatarHistory.length) toggleAvatarHistory(true);
+  }
+
+  // ---------- 历史头像：切换 / 清空 ----------
+  async function switchToAvatar(it) {
+    // 先判「已是当前」再判忙碌：否则忙碌期间的点击会被静默吞掉，用户以为按钮坏了
+    if (it.path === avatarState.path) {
+      closeAvatarPreview();
+      setAvatarMsg('已经是当前头像', '');
+      return;
+    }
+    if (avatarBusy) { setAvatarMsg('正在处理上一步操作，请稍候…', ''); return; }
+    closeAvatarPreview();
+    avatarBusy = true;
+    setAvatarMsg('切换中…', '');
+    try {
+      const nextHistory = mergeCurrentIntoHistory(it, avatarHistory);
+      const prev = avatarState;
+      const v = await persistAvatar(nextHistory, it);
+      applyAvatarValue(v);
+      const [date, time] = fmtTime(it.uploaded_at);
+      setAvatarMsg(`已切换为 ${date} ${time} 的头像 ✓ 前台刷新即生效`, 'ok');
+      // 切换不动文件，不删任何东西；失败则完全回滚到原状态
+      if (!v) { avatarState = prev; }
+    } catch (e) {
+      setAvatarMsg('切换失败：' + (e?.message || e) + '（当前头像未变）', 'err');
+      await loadAvatar();
+    } finally {
+      avatarBusy = false;
+    }
+  }
+
+  async function clearAvatarHistory() {
+    if (avatarBusy) return;
+    const extra = avatarHistory.length - 1;
+    if (extra <= 0) { setAvatarMsg('没有可清理的历史头像（只剩当前这张）', ''); return; }
+    if (!confirm(`清空 ${extra} 张历史头像？\n\n当前正在使用的这张会保留，前台显示不受影响。`)) return;
+    avatarBusy = true;
+    const btn = $('avatar-hist-clear');
+    if (btn) btn.disabled = true;
+    setAvatarMsg('清理中…', '');
+    try {
+      const keep = avatarHistory[0];
+      const drop = avatarHistory.slice(1).map((h) => h.path).filter(Boolean);
+      // 先删文件（失败静默跳过），再收缩 history —— 顺序保证「配置」始终指向存在的文件
+      if (drop.length) await supabase.storage.from(AVATAR_BUCKET).remove(drop).catch(() => {});
+      const v = await persistAvatar([keep], keep);
+      applyAvatarValue(v);
+      setAvatarMsg(`已清理 ${drop.length} 张历史头像 ✓ 当前头像保持不变`, 'ok');
+    } catch (e) {
+      setAvatarMsg('清理失败：' + (e?.message || e), 'err');
+      await loadAvatar();
+    } finally {
+      if (btn) btn.disabled = avatarHistory.length <= 1;
+      avatarBusy = false;
+    }
   }
 
   // 选中即校验：类型 → 体积 → 可解码。任一不过就直接拒绝，不上传、不改变现状态。
@@ -552,31 +838,37 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       uploaded = true;
       const publicUrl = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
 
-      const { error: setErr } = await supabase
-        .from('site_settings')
-        .upsert({
-          key: 'avatar',
-          value: { url: publicUrl, path, updated_at: new Date().toISOString() },
-          updated_at: new Date().toISOString(),
-        });
+      // 归档：新图插到最前，旧图保留；超过上限时裁掉尾部（仅删被裁掉的文件）
+      const entry = {
+        url: publicUrl, path, size: Number(file.size) || 0, name: file.name || '',
+        uploaded_at: new Date().toISOString(),
+      };
+      const merged = [entry, ...avatarHistory.filter((h) => h.path !== path)];
+      const keep = merged.slice(0, AVATAR_HISTORY_MAX);
+      const trimmed = merged.slice(AVATAR_HISTORY_MAX);
+
+      let setErr = null;
+      try {
+        await persistAvatar(keep, entry);
+      } catch (e) { setErr = e; }
       if (setErr) {
-        // 只回滚刚上传的新文件；旧头像（avatarState）保持原样
+        // 只回滚刚上传的新文件；旧头像与历史（avatarState/avatarHistory）保持原样
         await supabase.storage.from(AVATAR_BUCKET).remove([path]).catch(() => {});
-        setAvatarMsg('保存失败：' + setErr.message + '（已撤销本次上传，原头像未受影响）', 'err');
+        setAvatarMsg('保存失败：' + (setErr.message || setErr) + '（已撤销本次上传，原头像未受影响）', 'err');
         paintAvatarPreview(avatarState.url || AVATAR_FALLBACK_SRC);
         return;
       }
 
-      // 成功：删掉上一张（删除失败不影响结果，只是留下一个无用文件）
-      const oldPath = avatarState.path;
-      avatarState = { url: publicUrl, path };
-      if (oldPath && oldPath !== path) {
-        await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]).catch(() => {});
+      // 成功：只清掉被上限挤出去的旧文件（删除失败不影响结果，只是留下无用文件）
+      if (trimmed.length) {
+        await supabase.storage.from(AVATAR_BUCKET).remove(trimmed.map((h) => h.path)).catch(() => {});
       }
-      paintAvatarPreview(publicUrl);
-      $('avatar-src').textContent = '当前：已上传（存于 Storage）';
-      removeBtn.hidden = false;
-      setAvatarMsg('已保存 ✓ 前台首页/文章页刷新即生效（约 1 分钟内 CDN 生效）', 'ok');
+      const v = { url: entry.url, path: entry.path, size: entry.size, name: entry.name,
+                  uploaded_at: entry.uploaded_at, history: keep };
+      applyAvatarValue(v);
+      pickBtn.blur();
+      const extra = trimmed.length ? `；已自动清理最旧的 ${trimmed.length} 张` : '';
+      setAvatarMsg(`已保存 ✓ 已存入历史头像（共 ${keep.length} 张${extra}），前台刷新即生效`, 'ok');
       // 清掉表单里的 file，避免重复选中同一文件不触发 change
       $('avatar-input').value = '';
     } catch (e) {
@@ -594,8 +886,15 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   async function removeAvatar() {
     if (avatarBusy) return;
     if (!avatarState.url) { setAvatarMsg('当前没有自定义头像，已在使用默认图', ''); return; }
-    if (!confirm('删除自定义头像？删除后前台将回退显示 public/avatar.png 的默认头像。')) return;
+    const allFiles = Array.from(new Set([
+      avatarState.path, ...avatarHistory.map((h) => h.path),
+    ].filter(Boolean)));
+    const tip = allFiles.length > 1
+      ? `删除自定义头像？\n\n将同时清除配置项、历史记录，以及 ${allFiles.length} 个图片文件。\n删除后前台回退显示 public/avatar.png 的默认头像。`
+      : '删除自定义头像？删除后前台将回退显示 public/avatar.png 的默认头像。';
+    if (!confirm(tip)) return;
     avatarBusy = true;
+    closeAvatarPreview();
     $('avatar-pick').disabled = true;
     $('avatar-remove').disabled = true;
     setAvatarMsg('删除中…', '');
@@ -603,14 +902,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       // 先删配置项：这一步成功，前台就已经回到默认头像；文件删除失败只留下垃圾文件
       const { error } = await supabase.from('site_settings').delete().eq('key', 'avatar');
       if (error) { setAvatarMsg('删除失败：' + error.message, 'err'); return; }
-      if (avatarState.path) {
-        await supabase.storage.from(AVATAR_BUCKET).remove([avatarState.path]).catch(() => {});
+      // 历史文件一并清理（否则全部变成无人引用的孤儿文件）
+      if (allFiles.length) {
+        await supabase.storage.from(AVATAR_BUCKET).remove(allFiles).catch(() => {});
       }
-      avatarState = { url: '', path: '' };
-      paintAvatarPreview(AVATAR_FALLBACK_SRC);
-      $('avatar-src').textContent = '当前：默认 /avatar.png';
-      $('avatar-remove').hidden = true;
-      setAvatarMsg('已删除 ✓ 前台已回退为默认头像', 'ok');
+      applyAvatarValue(null);
+      setAvatarMsg('已删除 ✓ 前台已回退为默认头像（历史头像已一并清除）', 'ok');
     } catch (e) {
       setAvatarMsg('删除异常：' + (e?.message || e), 'err');
     } finally {
@@ -2355,6 +2652,17 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       });
     };
     $('avatar-remove').onclick = removeAvatar;
+    $('avatar-hist-btn').onclick = () => {
+      if (avatarHistory.length === 0) return;      // 无历史不展开空区域
+      toggleAvatarHistory();
+    };
+    $('avatar-hist-clear').onclick = clearAvatarHistory;
+    // 缩小窗口/横向滚动时若面板已展开，重算高度，避免文字换行后高度停留旧值
+    window.addEventListener('resize', () => {
+      if (!avatarHistOpen) return;
+      const panel = $('avatar-hist-panel');
+      if (panel && !panel.hidden) panel.style.height = 'auto';
+    });
 
     // 分类管理：新增分类
     $('cat-add-btn').onclick = () => {
