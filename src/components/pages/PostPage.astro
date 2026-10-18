@@ -152,16 +152,18 @@ const missingNotice = (() => {
     upd();
   })();
 
-  // 单篇文章表格定制：把表格包进滚动容器——
+  // 文章表格统一包进横向滚动容器 .wb-table-scroll ——
+  //  旧做法靠 .content table{display:block;overflow-x:auto} 自身滚动，但块盒化的表
+  //  在 iOS Safari 上手指滑动常被识别成整页滚动（表格自身滚不动），且边框圆角被切。
+  //  改为「外层 div 负责滚动、内层 table 保持表格语义」，两端行为一致。
   //  · vacation_cost-of-japan：display:table + width:100% 铺满，宽表由 wrapper 横向滚动
   //  · cost-of-travelling-Japan：CSS 定宽列（合计超容器宽），由 wrapper 承担横向滚动
-  // 仅在这两篇（data-post 钩子）内执行，其他文章不受影响。
+  //  · 其余文章：所有表格一律包裹，窄表不受影响（不产生滚动条），宽表自动可滚
+  //  幂等：已包裹过（父节点即 wrapper）则跳过，避免重复嵌套。
   (function () {
-    var scopes = document.querySelectorAll(
-      '.content[data-post="vacation_cost-of-japan"], .content[data-post="cost-of-travelling-Japan"]'
-    );
-    for (var s = 0; s < scopes.length; s++) {
-      var tables = scopes[s].querySelectorAll('table');
+    var contents = document.querySelectorAll('.content');
+    for (var c = 0; c < contents.length; c++) {
+      var tables = contents[c].querySelectorAll('table');
       for (var i = 0; i < tables.length; i++) {
         var t = tables[i];
         if (t.parentNode && t.parentNode.classList && t.parentNode.classList.contains('wb-table-scroll')) continue;
