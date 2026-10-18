@@ -145,14 +145,17 @@ a { color: inherit; }
 .profile-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .profile-name { font-size: 19px; margin: 0 0 6px; color: var(--text-strong); }
 .profile-tagline { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; line-height: 1.6; }
+/* 统计区（文章 / 分类）垂直间距收紧：
+   原 padding 14px + 条目 6px 使「边距」接近内容本身高度的 80%，卡片显得松散。
+   收紧后整卡桌面端 -20px、移动端 -16px，隔断线保留，不影响其它区块。 */
 .profile-stats {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
-  padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
 }
 .profile-stat {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   color: inherit; text-decoration: none; border-radius: 8px;
-  padding: 6px 0; transition: background .15s;
+  padding: 2px 0; transition: background .15s;
 }
 .profile-stat:hover { background: var(--accent-soft); }
 .profile-stat .num { font-size: 17px; font-weight: 800; color: var(--text-strong); transition: color .15s; }
@@ -997,7 +1000,8 @@ a { color: inherit; }
   .profile-avatar { width: 64px; height: 64px; margin: 0 auto 10px; font-size: 26px; }
   .profile-name { font-size: 17px; }
   .profile-tagline { font-size: 13px; margin-bottom: 12px; }
-  .profile-stats { padding: 12px 0; gap: 6px; }
+  /* 移动端同步收紧（12px → 8px），与桌面端保持同一套呼吸感 */
+  .profile-stats { padding: 8px 0; gap: 6px; }
   .profile-socials { gap: 16px; margin-top: 14px; }
 
   /* 通用小组件：收紧内边距，保证内容不贴边 */
