@@ -76,6 +76,7 @@ const missingNotice = (() => {
   };
 })();
 ---
+{/* image：封面仅用于分享缩略图（og:image / twitter:image），正文页不渲染封面大图 */}
 <Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs} image={post.cover || ''} type="article">
   <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
   <div class="post-head">
@@ -88,11 +89,8 @@ const missingNotice = (() => {
         <span>{t('post.readTime', { n: readMinutes })}</span>
       </div>
     </div>
-    {post.cover && (
-      <div class="post-cover">
-        <img src={post.cover} alt={post.title} loading="lazy" />
-      </div>
-    )}
+  {/* 封面不渲染在正文页：仅经 Base 输出 og:image / twitter:image 供分享缩略图，
+      列表页预览缩略图由 PostCard 消费 post.cover。 */}
   </div>
 
   <div class="post-layout">
