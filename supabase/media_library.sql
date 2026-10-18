@@ -98,20 +98,27 @@ create policy "auth delete images"
   using (bucket_id = 'images');
 
 -- ---------------------------------------------------------------------------
--- 4) 孤儿文件视图：media 里存在、但没有任何文章正文或封面引用它的文件
---    判定方式：posts.content 与 posts.cover 任一包含该 path 即视为已引用
---    （封面图只进 cover 列、不进正文，只查 content 会把它误判为孤儿，
---     后台一键清理时误删——2026-10-18 修复）
+-- 4) 孤儿文件视图：media 里存在、但没有任何文章引用它的文件
+--    判定方式：
+--      · 图片/一般文件：posts.content 与 posts.cover 任一包含该 path 即视为已引用
+--        （封面图只进 cover 列、不进正文，只查 content 会把它误判为孤儿，
+--         后台一键清理时误删——2026-10-18 修复）
+--      · 附件（bucket='attachments'）：不进正文/封面，靠 post_slug 归属判定，
+--        post_slug 非空即「已归属某篇文章」，不算孤儿（2026-10-19 修复；
+--        否则正常附件会被误判为孤儿，一键清理直接删）
 --    注意：仅用于后台提示，删除仍需人工确认（可能刚上传、尚未插入正文/设为封面）
 -- ---------------------------------------------------------------------------
 create or replace view media_orphans as
 select m.*
 from media m
-where not exists (
-  select 1 from posts p
-  where p.content like '%' || m.path || '%'
-     or coalesce(p.cover, '') like '%' || m.path || '%'
-);
+where not (
+        m.bucket = 'attachments' and m.post_slug is not null  -- 已归属文章的附件：非孤儿
+      )
+  and not exists (
+    select 1 from posts p
+    where p.content like '%' || m.path || '%'
+       or coalesce(p.cover, '') like '%' || m.path || '%'
+  );
 
 -- 视图本身不设 RLS；底层 media 已限登录用户，故匿名读不到内容
 grant select on media_orphans to authenticated;

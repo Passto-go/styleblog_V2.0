@@ -341,7 +341,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   let supabase = null;
 
   // 当前编辑态
-  const state = { id: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false };
+  const state = { id: '', slug: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false };
+
+  // 本会话上传、但上传时文章尚无 slug 的附件 path：保存成功后按最终 slug 补关联 post_slug
+  const pendingAttach = new Set();
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
@@ -1822,6 +1825,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   // ---------- 表单 ----------
   function setForm(p = {}) {
     state.id = p.id || '';
+    state.slug = p.slug || '';
     $('f-title').value = p.title || '';
     $('f-slug').value = p.slug || '';
     slugAuto = !p.slug; // 有历史 slug（已发布/已存草稿）→ 不自动派生；新建空白 → 自动
@@ -2142,6 +2146,16 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         error = r.error;
         if (!error && r.data?.[0]) state.id = r.data[0].id;
       }
+      // 附件补关联：上传时文章尚无 slug（新建首存）→ 此刻按最终 slug 回填 media.post_slug，
+      // 否则附件永远挂空（post_slug=null），正文页底部附件区与后台附件列表都取不到
+      if (!error && pendingAttach.size) {
+        const base = baseSlug(row.slug);
+        try {
+          await supabase.from('media').update({ post_slug: base }).in('path', [...pendingAttach]);
+        } catch {}
+        pendingAttach.clear();
+      }
+      if (!error) { state.slug = row.slug; refreshAttachList(); }
       // 新建分类：同步写入注册表（best-effort，categories 表未建也不影响文章发布）
       if (!error && $('f-category').value === '__new__' && row.category) {
         try {
@@ -2615,6 +2629,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     if (error) throw error;
     const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
     await recordMedia({ path, bucket, originalName: file.name, mime: file.type, size: file.size });
+    if (!state.slug) pendingAttach.add(path); // 文章尚无 slug：保存成功后补关联
     return { bucket, isImg, path, publicUrl };
   }
 
