@@ -2541,6 +2541,16 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     clearTimeout(previewTimer);
     previewTimer = setTimeout(() => {
       $('preview').innerHTML = marked.parse($('f-content').value || '') || '<p class="wb-hint">暂无内容</p>';
+      // 与前台（renderMarkdown 服务端包裹）同规则：表格包进 .wb-table-scroll，
+      // 保证预览与线上展示一致——窄表收缩留白、宽表 wrapper 内横向滚动。
+      // 幂等：父节点已是 wrapper 则跳过，避免重复嵌套。
+      $('preview').querySelectorAll('table').forEach((t) => {
+        if (t.parentElement && t.parentElement.classList.contains('wb-table-scroll')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'wb-table-scroll';
+        t.parentNode.insertBefore(wrap, t);
+        wrap.appendChild(t);
+      });
     }, 120);
   }
 

@@ -171,10 +171,11 @@ const missingNotice = (() => {
   //  旧做法靠 .content table{display:block;overflow-x:auto} 自身滚动，但块盒化的表
   //  在 iOS Safari 上手指滑动常被识别成整页滚动（表格自身滚不动），且边框圆角被切。
   //  改为「外层 div 负责滚动、内层 table 保持表格语义」，两端行为一致。
-  //  · vacation_cost-of-japan：display:table + width:100% 铺满，宽表由 wrapper 横向滚动
-  //  · cost-of-travelling-Japan：CSS 定宽列（合计超容器宽），由 wrapper 承担横向滚动
-  //  · 其余文章：所有表格一律包裹，窄表不受影响（不产生滚动条），宽表自动可滚
-  //  幂等：已包裹过（父节点即 wrapper）则跳过，避免重复嵌套。
+  //  · 窄表：wrapper 以 fit-content 收缩包裹表格，右侧留白、不画多余边框线条
+  //  · 宽表：表格按 max-content 自然宽度展示，溢出由 wrapper 横向滚动
+  //  · 铺满作用域（vacation_cost-of-japan）：wrapper 满宽 + 表格 width:100%
+  //  正常路径下 renderMarkdown 已在服务端包裹，此处为 SSR 输出异常时的幂等兜底：
+  //  已包裹过（父节点即 wrapper）则跳过，避免重复嵌套。
   (function () {
     var contents = document.querySelectorAll('.content');
     for (var c = 0; c < contents.length; c++) {

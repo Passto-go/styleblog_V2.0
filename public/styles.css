@@ -274,9 +274,10 @@ a { color: inherit; }
 .content ul, .content ol { padding-left: 1.4em; }
 .content li { margin: .4em 0; }
 /* 文章正文表格：补齐缺失样式，修复裸表导致的列错位/无边框/宽表溢出 */
-/* 注意：横向滚动已交给外层的 .wb-table-scroll 容器（脚本运行时包裹），
-   表格自身保持标准表格盒、不再自己滚动——块盒化表格在 iOS Safari 上
-   手指横滑常被判成整页滚动，滚不动。未包裹时的兜底仍用 fit-content 收缩。 */
+/* 注意：横向滚动已交给外层的 .wb-table-scroll 容器（renderMarkdown 服务端包裹，
+   后台预览/客户端脚本为同规则幂等兜底），表格自身保持标准表格盒、不再自己滚动——
+   块盒化表格在 iOS Safari 上手指横滑常被判成整页滚动，滚不动。
+   未包裹时的兜底仍用 fit-content 收缩（表格不超出页面）。 */
 .content table {
   display: table;
   width: fit-content;
@@ -325,12 +326,22 @@ a { color: inherit; }
   max-width: 100%;
   table-layout: auto;
 }
-/* display:table / 定宽超宽表格通用滚动包裹：由脚本在运行时包裹所有正文表格，
+/* display:table / 定宽超宽表格通用滚动包裹：由渲染层（renderMarkdown 服务端包裹，
+   后台预览与 PostPage 客户端脚本为同规则幂等兜底）包裹所有正文表格，
    由 wrapper 承担横向滚动，避免表格把整个页面撑出横向溢出。
    为什么不继续让 table 自己滚动（display:block + overflow-x:auto）：
-   块盒化的表格在 iOS Safari 上手指横向滑动常被判成整页滚动，表格滚不动。 */
+   块盒化的表格在 iOS Safari 上手指横向滑动常被判成整页滚动，表格滚不动。
+
+   wrapper 宽度策略（两种展示形态的分界）：
+   · 表格自然宽度（max-content）≤ 容器宽 → wrapper 以 fit-content 收缩包裹表格，
+     边框/圆角紧贴表格，右侧剩余空间为纯留白，不产生多余横线或占位线条；
+   · 表格自然宽度 > 容器宽 → max-width:100% 把 wrapper 收到容器宽，
+     表格溢出 wrapper，由 wrapper 横向滚动查看完整内容（表格永不被压缩）。
+   旧写法 width:100% 让 wrapper 恒满宽：窄表收缩后右侧留下一段带 wrapper
+   边框的空区（上/下/右边框框住空白），即用户报告的「多余的横线/占位线条」。 */
 .wb-table-scroll {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;   /* iOS 惯性滚动 */
   overscroll-behavior-x: contain;      /* 滚到边界时不再带动整页 */
@@ -345,16 +356,20 @@ a { color: inherit; }
   border: 0;              /* 外框由 wrapper 提供，避免双层边框 */
 }
 /* 包进 wrapper 后，table 不再需要自己滚动：还原为标准表格盒，
-   宽度仍按内容收缩（fit-content），超出容器时由 wrapper 横向滚动 */
+   宽度按内容自然宽度（max-content）展示——窄表收缩留白、宽表溢出由
+   wrapper 横向滚动，任何情况下都不压缩列宽 */
 .content .wb-table-scroll > table {
   display: table;
-  width: fit-content;
+  width: max-content;
   max-width: none;
   overflow-x: visible;
 }
-.content[data-post="vacation_cost-of-japan"] .wb-table-scroll { margin: 0; }
+/* 铺满作用域：wrapper 恢复满宽，表格 width:100% 才有可铺满的对象
+   （fit-content 的 wrapper 会让 100% 失去参照，表格改按内容收缩） */
+.content[data-post="vacation_cost-of-japan"] .wb-table-scroll { margin: 0; width: 100%; }
 .content[data-post="vacation_cost-of-japan"] .wb-table-scroll > table {
   margin: 0;
+  width: 100%;
 }
 /* 铺满作用域内表头恢复可换行：该文章表头较长（如「账面金额合计（人民币列）」
    在数据列），nowrap 会把窄表撑到超宽触发滚动，违背「铺满」的初衷 */

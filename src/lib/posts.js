@@ -399,8 +399,16 @@ export async function findTranslation(slug, targetLang) {
 }
 
 // 渲染 Markdown，并为 h2/h3 生成锚点 id；返回 { html, headings(用于目录) }
+// 表格统一包进横向滚动容器 .wb-table-scroll（见 styles.css 该类的宽度策略）：
+//   · 窄表：wrapper 以 fit-content 收缩包裹表格，右侧留白、无多余边框线条
+//   · 宽表：表格按 max-content 自然宽度展示，溢出部分由 wrapper 横向滚动
+// GFM 表格不会嵌套，非贪婪匹配逐个包裹安全；客户端脚本（PostPage）与后台
+// 预览（admin.astro）按同一规则幂等兜底，已包裹的会跳过，不会重复嵌套。
 export function renderMarkdown(content = '') {
-  const raw = marked.parse(content || '');
+  const raw = marked.parse(content || '').replace(
+    /<table>[\s\S]*?<\/table>/g,
+    (m) => `<div class="wb-table-scroll">${m}</div>`
+  );
   const headings = [];
   const html = String(raw).replace(/<h([23])>(.*?)<\/h\1>/g, (m, lvl, inner) => {
     const text = inner.replace(/<[^>]+>/g, '');
