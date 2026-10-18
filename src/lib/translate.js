@@ -203,7 +203,62 @@ function sliceAtSentence(text, max) {
   return out;
 }
 
-// 从模型输出中提取 JSON。容错：模型偶尔包裹 ```json 围栏或带前后废话。
+// 把模型写的字符串值按「常见转义」还原。
+// 与 JSON.parse 的区别：遇到裸控制字符、裸双引号都原样保留，不报错。
+function unescapeLoose(s) {
+  const map = { n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f' };
+  let out = '';
+  for (let i = 0; i < s.length; ) {
+    const c = s[i];
+    if (c === '\\' && i + 1 < s.length) {
+      const n = s[i + 1];
+      if (map[n] !== undefined) { out += map[n]; i += 2; continue; }
+      if (n === 'u' && i + 5 < s.length) {
+        const hex = s.slice(i + 2, i + 6);
+        if (/^[0-9a-fA-F]{4}$/.test(hex)) { out += String.fromCharCode(parseInt(hex, 16)); i += 6; continue; }
+      }
+      out += n; i += 2; continue;
+    }
+    out += c; i += 1;
+  }
+  return out;
+}
+
+// 兜底解析：只认 title / excerpt / content 三个字段，按字段名定位取值。
+//
+// 解决什么：模型（尤其 glm-4-flash）常把这三个值写成「未转义换行 + 未转义双引号」
+// 的伪 JSON，例如 content 里含代码块 compatibility_flags = ["nodejs_compat"]，
+// 引号没写成 \"，换行也没写成 \n。此时 JSON.parse 必然抛
+// 「Bad control character」或「Expecting ',' delimiter」，三层容错全废。
+// 因此不再依赖 JSON 语法，只按字段名切段，裸引号/裸换行原样保留——
+// 对「外层围栏」「未转义换行」「未转义双引号」三种畸形全部免疫。
+const LOOSE_FIELDS = ['title', 'excerpt', 'content'];
+function parseByFields(raw) {
+  let text = String(raw || '').trim();
+  text = text.replace(/^\s*```(?:json)?\s*/, '').replace(/\s*```\s*$/, '').trim();
+
+  const hits = [];
+  for (const f of LOOSE_FIELDS) {
+    const m = new RegExp(`"${f}"\\s*:\\s*"`).exec(text);
+    if (m) hits.push({ start: m.index, valStart: m.index + m[0].length, field: f });
+  }
+  if (!hits.length) return null;
+  hits.sort((a, b) => a.start - b.start);
+
+  const out = {};
+  hits.forEach((h, idx) => {
+    const end = idx + 1 < hits.length ? hits[idx + 1].start : text.length;
+    let seg = text.slice(h.valStart, end);
+    // 去掉段尾的 `"` / `",` / `"}` 之类结构噪声
+    seg = seg.replace(/"\s*[,}]?\s*$/, '');
+    out[h.field] = unescapeLoose(seg);
+  });
+  // 与 normalizeTranslation 的判据一致：标题和正文必须有
+  if (String(out.title || '').trim() && String(out.content || '').trim()) return out;
+  return null;
+}
+
+// 从模型输出中提取 JSON。容错：围栏包裹、前后废话、未转义换行/引号。
 export function extractJSON(raw) {
   const text = String(raw || '').trim();
   try {
@@ -218,6 +273,9 @@ export function extractJSON(raw) {
   if (start !== -1 && end > start) {
     try { return JSON.parse(text.slice(start, end + 1)); } catch {}
   }
+  // 最后一层：放弃 JSON 语法，按字段名宽松切分（应对未转义换行 / 裸双引号）
+  const loose = parseByFields(text);
+  if (loose) return loose;
   throw new Error('模型未返回有效的 JSON');
 }
 
