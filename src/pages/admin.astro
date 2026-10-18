@@ -2148,14 +2148,25 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       }
       // 附件补关联：上传时文章尚无 slug（新建首存）→ 此刻按最终 slug 回填 media.post_slug，
       // 否则附件永远挂空（post_slug=null），正文页底部附件区与后台附件列表都取不到
-      if (!error && pendingAttach.size) {
-        const base = baseSlug(row.slug);
-        try {
-          await supabase.from('media').update({ post_slug: base }).in('path', [...pendingAttach]);
-        } catch {}
-        pendingAttach.clear();
+      if (!error) {
+        const oldBase = state.slug ? baseSlug(state.slug) : '';
+        const newBase = baseSlug(row.slug);
+        // slug 基准名变更（用户改过 slug）：旧归属下的媒体（正文图 + 附件）迁到新 base，
+        // 否则它们既不再随文章展示、删文章时也不会被清理，成为无声泄漏
+        if (oldBase && oldBase !== newBase) {
+          try {
+            await supabase.from('media').update({ post_slug: newBase }).eq('post_slug', oldBase);
+          } catch {}
+        }
+        if (pendingAttach.size) {
+          try {
+            await supabase.from('media').update({ post_slug: newBase }).in('path', [...pendingAttach]);
+          } catch {}
+          pendingAttach.clear();
+        }
+        state.slug = row.slug;
+        refreshAttachList();
       }
-      if (!error) { state.slug = row.slug; refreshAttachList(); }
       // 新建分类：同步写入注册表（best-effort，categories 表未建也不影响文章发布）
       if (!error && $('f-category').value === '__new__' && row.category) {
         try {
@@ -2591,7 +2602,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // 生成 storage 路径：时间戳 + ASCII 安全名 + 白名单扩展名（图片与附件通用）
-  function safeUploadPath(name, isImage) {
+  // allowImageExt：目标桶为 attachments 时，图片附件也要保留原扩展名（png/jpg…），
+  // 否则会被打成 .bin（下载名虽由 original_name 决定，但 URL 与内联分发都应是真实类型）
+  function safeUploadPath(name, isImage, allowImageExt) {
     const raw = String(name || '');
     const ext = (raw.toLowerCase().match(/\.([a-z0-9]{1,8})$/) || [])[1] || '';
     const base = raw
@@ -2601,8 +2614,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       .replace(/[^a-z0-9-]/g, '')
       .replace(/-+/g, '-').replace(/^-|-$/g, '')
       .slice(0, 40);
-    const allow = isImage ? IMAGE_EXTS : ATTACH_EXTS;
-    const safeExt = allow.includes(ext) ? ext : (isImage ? 'png' : 'bin');
+    const allow = isImage ? IMAGE_EXTS : (allowImageExt ? [...IMAGE_EXTS, ...ATTACH_EXTS] : ATTACH_EXTS);
+    const safeExt = allow.includes(ext) ? ext : (isImage || allowImageExt ? 'png' : 'bin');
     return `${Date.now()}-${base || (isImage ? 'image' : 'file')}.${safeExt}`;
   }
 
@@ -2622,7 +2635,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   async function uploadOne(file, forceBucket) {
     const bucket = forceBucket || bucketFor(file.name);
     const isImg = bucket === 'images';
-    const path = safeUploadPath(file.name, isImg);
+    const path = safeUploadPath(file.name, isImg, bucket === 'attachments');
     const { error } = await supabase.storage
       .from(bucket)
       .upload(path, file, { upsert: true, contentType: file.type || undefined });

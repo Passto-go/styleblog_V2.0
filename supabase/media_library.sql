@@ -60,7 +60,10 @@ values (
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/plain', 'text/csv', 'text/markdown',
     'application/zip', 'application/x-zip-compressed',
-    'application/octet-stream'
+    'application/octet-stream',
+    -- 附件不限于文档：图片也可作为附件上传（2026-10-19 补，
+    -- 否则图片附件被 storage 的 MIME 白名单直接拒收）
+    'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'
   ]
 )
 on conflict (id) do update set
