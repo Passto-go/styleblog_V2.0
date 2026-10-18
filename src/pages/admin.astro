@@ -180,7 +180,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
           </div>
           <p class="wb-hint wb-cat-note">
             这里管理所有已上传的图片与附件。删除文章时会自动清理其名下文件；
-            「孤儿文件」指已上传但没有任何文章引用它们——正文与封面都算引用（仅设为封面、未插入正文的文件不是孤儿），可一键清理。
+            「孤儿文件」指已上传但没有任何文章引用它们——正文、封面都算引用，附件只要归属了文章（上传时带文章上下文）也不算孤儿，可一键清理。
           </p>
 
           <div class="wb-fm-actions">
@@ -1010,15 +1010,24 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     }
     allMedia = data || [];
 
-    // 2) 孤儿判定：以「正文 + 封面」即时引用为准，不依赖 media_orphans 视图
-    //    口径：posts.content 或 posts.cover 任一包含该 path 即非孤儿。
-    //    历史上视图只查 content，会把「仅设为封面、未插入正文」的图误判为孤儿，
-    //    后台一键清理即误删（2026-10-18 修复：前端改为自行判定，与视图解耦，
-    //    旧视图即便未更新也不会造成误判；media_library.sql 中的视图定义已同步修正）
+    // 2) 孤儿判定：以「正文 + 封面 + 附件归属」即时引用为准，不依赖 media_orphans 视图
+    //    口径：
+    //      · 图片/一般文件：posts.content 或 posts.cover 任一包含该 path 即非孤儿
+    //      · 附件（bucket='attachments'）：不进正文/封面，靠 post_slug 归属判定，
+    //        post_slug 非空即「已归属某篇文章」，不算孤儿
+    //    历史教训：① 只查 content 会把「仅设为封面」的图误判（2026-10-18 修复）；
+    //    ② 附件被一律误判为孤儿，一键清理直接删（2026-10-19 修复）。
+    //    前端自行判定而非依赖视图：旧视图未更新也不会造成误判（media_library.sql
+    //    中的视图定义已同步为同一口径）
     {
       const { data: posts } = await supabase.from('posts').select('content,cover');
       const blob = (posts || []).map((p) => (p.content || '') + '\n' + (p.cover || '')).join('\n');
-      orphanPaths = new Set(allMedia.filter((m) => !blob.includes(m.path)).map((m) => m.path));
+      orphanPaths = new Set(
+        allMedia
+          .filter((m) => !(m.bucket === 'attachments' && m.post_slug)) // 已归属文章的附件：非孤儿
+          .filter((m) => !blob.includes(m.path))
+          .map((m) => m.path)
+      );
     }
     renderMedia();
   }
@@ -1117,7 +1126,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const msg = $('fm-msg');
     const list = allMedia.filter((m) => orphanPaths.has(m.path));
     if (!list.length) { msg.textContent = '没有孤儿文件 ✓'; return; }
-    if (!confirm(`清理 ${list.length} 个孤儿文件？\n它们未被任何文章的正文或封面引用，删除不可恢复。`)) return;
+    if (!confirm(`清理 ${list.length} 个孤儿文件？\n它们未被任何文章的正文、封面引用，也不是已归属文章的附件，删除不可恢复。`)) return;
     msg.textContent = '清理中…';
     let done = 0, fail = 0;
     for (const m of list) {
