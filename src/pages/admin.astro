@@ -332,6 +332,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
 
+  // 一键翻译提示行当前对应的版本 { id, lang }：切版本后用它判断旧提示是否已过期
+  let trMsgFor = { id: '', lang: '' };
+
   // slug 自动派生开关：新建文章为 true（slug 随标题/语言联动），
   // 一旦用户手动改过 slug 即置 false，避免被标题输入或语言切换覆盖。
   let slugAuto = true;
@@ -1647,8 +1650,30 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   function setTrMsg(text, kind = '') {
     const el = $('tr-msg');
+    if (!el) return;
     el.textContent = text;
     el.dataset.kind = kind;
+    // 记录这次提示对应的版本（id + 语言）：切版本后据此判断提示是否已过期
+    trMsgFor = { id: String(state.id || ''), lang: state.lang };
+  }
+
+  // 按「编辑器当前正在编辑的版本」重新生成 tr-msg 提示。
+  // 存在的意义：点语言按钮 / 点译文状态按钮 / 载入历史版本都会换编辑对象，
+  // 旧提示留着的语言与 URL 就都是错的（典型现象：点了 EN，提示仍说「已切换到日本語版」）。
+  // 因此凡是改变当前编辑版本的操作，末尾都要调它做一次对齐。
+  function renderTrMsg() {
+    const row = state.id ? allPosts.find((p) => p.id === state.id) : null;
+    const label = LANGS[state.lang] || '中文';
+    if (!row) {
+      // 新建态（含「尚无该语言版本」转入的新建态）——说明将新建该语言版本
+      setTrMsg(`当前为新${label}版草稿：发布后即创建${label}版（不影响其它语言版本）`, '');
+      return;
+    }
+    if (row.published) {
+      setTrMsg(`正在编辑${label}版（已发布，URL ${postUrl(row)}）；保存并发布后立即生效`, 'ok');
+    } else {
+      setTrMsg(`正在编辑${label}版（草稿，尚未发布）；发布后读者才能看到`, 'warn');
+    }
   }
 
   // 译文状态行：显示当前文章的英/日版本是否已存在（按 base slug 匹配内存全量表），
@@ -1673,7 +1698,13 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     el.querySelectorAll('button[data-lang]').forEach((b) => {
       b.onclick = () => {
         const row = findVersion(base, b.dataset.lang, state.id);
-        if (row) { setForm(row); state.dirty = false; setMsg(`已载入《${row.title}》`); }
+        if (row) {
+          setForm(row);
+          state.dirty = false;
+          setMsg(`已载入《${row.title}》`);
+          // 这里也是「换编辑对象」：不同步提示就会残留上一个语言的 URL
+          renderTrMsg();
+        }
       };
     });
     updateSlugStatusMarks();
@@ -1767,6 +1798,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         `✓ 译文已填入${result.parts > 1 ? `（长文分 ${result.parts} 段翻译，请重点检查段落衔接）` : ''}。请通读检查后点击「发布」`,
         'ok'
       );
+      // setTrMsg 已把 trMsgFor 记成「当前编辑的译文版本」，后续 setForm 不会误判过期而覆盖这条提示
     } catch (e) {
       if (e?.name === 'AbortError') {
         setTrMsg('翻译超时（3 分 20 秒）。服务可能持续繁忙，稍后再点一次试试', 'err');
@@ -1805,6 +1837,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     updateSlugHint();
     updateLangState();
     state.dirty = false; // 刚载入的行视为「无未保存改动」
+    // 提示行与当前版本对齐：仅当它已过期（换了 id 或语言）才重算，
+    // 避免冲掉「✓ 译文已填入…」这类刚生成的有效提示。
+    if (String(state.id || '') !== trMsgFor.id || state.lang !== trMsgFor.lang) renderTrMsg();
     saveLocalDraft();
   }
 
@@ -1960,12 +1995,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       // ① 已有该语言版本 → 整行载入（setForm 会一并换标题/摘要/正文/slug/id/发布状态）
       setForm(target);
       state.dirty = false;
-      const label = LANGS[nextLang];
-      setTrMsg(`已切换到${label}版，标题、摘要、正文均为${label}内容`, 'ok');
-      // 各语言 URL 不同：切换只是换编辑对象，不会改动线上地址，明确告知避免误解
-      if (target.published) {
-        setTrMsg(`已切换到${label}版（已发布，URL ${postUrl(target)}）；当前编辑的就是该语言线上文章`, 'ok');
-      }
+      // 提示统一由 renderTrMsg 按「刚载入的这一行」生成：语言、发布状态、URL 三者
+      // 一次性对齐。历史上这里先写一条通用提示、命中已发布时再覆盖一条，
+      // 而其它入口（译文状态按钮、草稿恢复）切换后完全不刷新，才出现
+      // 「点了 EN、提示还说日本語版」的错位。
+      renderTrMsg();
     } else {
       // ② 尚无该语言版本 → 转新建态，slug 以原文 base 为准拼后缀（标题此刻仍是原文，不能按标题推导）
       state.id = '';
@@ -1983,6 +2017,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
           : `该文尚无${label}版：已转入新建态（Slug 沿用主体名 + 后缀，状态为草稿）。当前内容仍是原文，请点「译成${label}」生成译文或自行改写后再发布`,
         'warn'
       );
+      // 该分支提示语本身信息密度更高（含操作指引），不覆盖，但同样记下所属版本，
+      // 后续再发生切换时由 renderTrMsg 接管，避免旧提示残留。
+
     }
 
     updateSlugHint();
