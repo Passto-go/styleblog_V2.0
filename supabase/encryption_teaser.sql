@@ -97,11 +97,16 @@ grant execute on function post_clear_encryption(uuid) to anon, authenticated;
 --    应用侧显式列清单已包含它，与 is_encrypted / pass_hint 同等对待。
 
 -- 7) 自检：确认列与函数就位
+--    ⚠️ Supabase SQL Editor 单事务整本执行：任一条语句失败 → 全脚本回滚。
+--       若本文件曾报错退出，修好后直接重跑即可（全程幂等，无副作用）。
+--    注意：pg_get_function_identity_arguments 只接受 oid 参数；
+--          传 proname（name 类型）会报 42883 function does not exist。
 select column_name, data_type, column_default
 from information_schema.columns
 where table_schema = 'public' and table_name = 'posts' and column_name = 'list_visible';
 
-select proname, pg_get_function_identity_arguments(proname) as args
-from pg_proc
-where proname in ('post_set_password', 'post_set_list_visible', 'post_clear_encryption')
-order by proname;
+select p.proname, pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p
+where p.pronamespace = 'public'::regnamespace
+  and p.proname in ('post_set_password', 'post_set_list_visible', 'post_clear_encryption')
+order by p.proname;
