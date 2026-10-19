@@ -6,6 +6,19 @@ import { site } from '../data/site.js';
 const URL = import.meta.env.PUBLIC_SUPABASE_URL;
 const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
+// 服务端 Supabase 客户端：统一 6s 超时。
+// 目的：防止 Supabase 网络挂起把 Worker 拖到 Cloudflare 边缘超时（访客侧表现为
+// 522 / 524 错误码页）。AbortSignal.timeout 在 Cloudflare Workers 与 Node 18+ 可用。
+// extra：透传 fetch 选项（如 getSetting 的 no-store）。
+function sbClient(extra) {
+  return createClient(URL, KEY, {
+    auth: { persistSession: false },
+    global: {
+      fetch: (u, i) => fetch(u, { ...i, ...(extra || {}), signal: AbortSignal.timeout(6000) }),
+    },
+  });
+}
+
 // 构建时（服务端）从 Supabase 拉取已发布文章。
 // 未配置或拉取失败则回退到本地示例数据，保证站点始终能构建。
 async function fetchAll() {
@@ -13,7 +26,7 @@ async function fetchAll() {
     console.warn('[posts] 未检测到 Supabase 环境变量，使用本地示例数据。');
     return samplePosts;
   }
-  const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+  const supabase = sbClient();
   // 显式排除垃圾箱文章（deleted_at is null）：RLS 已据此过滤，此处再挡一道，
   // 即使策略未及时更新也安全。若数据库尚未执行 posts_trash.sql（无该列），
   // 回退为不带该条件的查询，避免整个前台因缺列而取不到文章。
@@ -72,7 +85,7 @@ export async function getAllCategorySlugs() {
     slugs.add(normalize(p).categorySlug || 'uncategorized');
   }
   try {
-    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const supabase = sbClient();
     const { data, error } = await supabase
       .from('categories')
       .select('slug');
@@ -213,10 +226,7 @@ export async function getPostWithVersions(slug, lang = 'zh') {
 export async function getSetting(key, opts = {}) {
   if (!URL || !KEY) return null;
   try {
-    const supabase = createClient(URL, KEY, {
-      auth: { persistSession: false },
-      global: opts.noStore ? { fetch: (u, i) => fetch(u, { ...i, cache: 'no-store' }) } : {},
-    });
+    const supabase = sbClient(opts.noStore ? { cache: 'no-store' } : undefined);
     const { data, error } = await supabase
       .from('site_settings')
       .select('value')
@@ -279,7 +289,7 @@ export async function getCategories(lang = 'zh', opts = {}) {
   // 注册表（后台「新增分类」产生，可能 0 篇）
   let registry = [];
   try {
-    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const supabase = sbClient();
     // 先尝试带多语言列查询；若数据库尚未执行迁移（无 name_en 列），
     // 回退为只取 name，保证上线顺序不受影响（先发代码、后执行 SQL 也不会 500）。
     let { data, error } = await supabase
@@ -357,7 +367,7 @@ export async function getPostsByCategory(slug, lang = 'zh') {
 // 旧分类 slug → 新 slug 的 301 映射（重命名分类时写入）。前台分类页 SSR 用 anon key 查询。
 export async function getCategoryAlias(oldSlug) {
   try {
-    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const supabase = sbClient();
     const { data } = await supabase
       .from('category_aliases')
       .select('new_slug')
@@ -422,7 +432,7 @@ export function renderMarkdown(content = '') {
 export async function getAttachments(baseSlug) {
   if (!URL || !KEY || !baseSlug) return [];
   try {
-    const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
+    const supabase = sbClient();
     const { data, error } = await supabase
       .from('post_attachments')
       .select('path, original_name, mime, size_bytes')

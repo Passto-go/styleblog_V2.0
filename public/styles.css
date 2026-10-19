@@ -183,18 +183,18 @@ a { color: inherit; }
 }
 .widget-title {
   font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 1px;
-  margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+  margin: 0 0 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
 }
 .widget-quote { font-size: 15px; line-height: 1.7; color: var(--text); min-height: 52px; overflow-wrap: anywhere; }
 .quote-src { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; text-align: right; }
 /* 倒计时：目标名过长时允许换行，避免撑破卡片 */
 .countdown-label { font-size: 14px; color: var(--muted); margin: 0 0 10px; line-height: 1.6; overflow-wrap: anywhere; }
-/* 时区提示：跟读标签同行、不撑高布局，窄屏自动换行也不溢出 */
+/* 时区提示：跟随「倒计时」标题同行（flex 子项），窄屏不压缩、不撑破卡片；
+   极端窄屏放不下时随 flex-wrap 整体换到第二行（整齐降级，不错位） */
 .countdown-tz {
-  display: inline-block; margin-left: 6px; padding: 1px 8px;
-  font-size: 11.5px; line-height: 1.5; color: var(--accent);
-  background: var(--accent-soft); border-radius: 999px; white-space: nowrap;
-  vertical-align: baseline;
+  flex: 0 0 auto; white-space: nowrap; letter-spacing: 0;
+  padding: 1px 8px; font-size: 11.5px; font-weight: 600; line-height: 1.5;
+  color: var(--accent); background: var(--accent-soft); border-radius: 999px;
 }
 .countdown-grid { display: flex; gap: 10px; }
 .cd-cell { flex: 1; min-width: 0; text-align: center; background: var(--surface-2); border-radius: 10px; padding: 10px 4px; }
@@ -880,6 +880,8 @@ a { color: inherit; }
 }
 @media (max-width: 360px) {
   .footer-clock-weekday { display: none; }
+  /* 超窄屏：倒计时时区徽章缩字号，保证与标题同行不溢出 */
+  .countdown-tz { font-size: 11px; padding: 1px 7px; }
 }
 
 /* ---------- 响应式 ---------- */

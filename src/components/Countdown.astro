@@ -41,11 +41,11 @@ const dateStr = fmtDate(target, lang);
 const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
 ---
 <section class="widget">
-  <h4 class="widget-title"><Icon name="clock" size={15} /> {t('widget.countdown')}</h4>
-  <p class="countdown-label">
-    {t('widget.countdownTo', { label: fullLabel })}
+  <h4 class="widget-title">
+    <Icon name="clock" size={15} /> {t('widget.countdown')}
     <span class="countdown-tz">{t('widget.countdownTz')}</span>
-  </p>
+  </h4>
+  <p class="countdown-label">{t('widget.countdownTo', { label: fullLabel })}</p>
   <div class="countdown-grid" id="countdown">
     {units.map((u, i) => (
       <div class="cd-cell">
