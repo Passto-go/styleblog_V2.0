@@ -1,9 +1,17 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { useTranslations } from '../../i18n/ui.js';
+import { getSetting } from '../../lib/posts.js';
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
+
+// 后台可编辑文案（site_settings 键 about_content，见 admin.astro「关于页面文案」卡片）。
+// 未配置 / 读取失败 / 字段为空时回退 i18n 内置文案，保证页面永远有内容。
+// noStore：后台保存后刷新前台要立刻看到新文案，不能被 fetch 缓存喂回旧值。
+const saved = await getSetting('about_content', { noStore: true });
+const lead = (saved && saved[lang] && saved[lang].lead) || t('about.lead');
+const bodyText = (saved && saved[lang] && saved[lang].body) || t('about.body');
 
 // HTML 转义，防止正文内容被当作标签注入
 function escapeHtml(s) {
@@ -23,17 +31,17 @@ function inline(s) {
 }
 
 // 按空行切段；以「## 」开头的段落渲染为二级小标题，其余为正文段落
-const blocks = t('about.body')
+const blocks = bodyText
   .split('\n\n')
   .map((b) => {
     const m = b.match(/^##\s+([\s\S]+)$/);
     return m ? { tag: 'h2', text: m[1] } : { tag: 'p', text: b };
   });
 ---
-<Base lang={lang} title={t('about.title')} description={t('about.lead')}>
+<Base lang={lang} title={t('about.title')} description={lead}>
   <section class="page">
     <h1 class="page-title">{t('about.title')}</h1>
-    <p class="lead">{t('about.lead')}</p>
+    <p class="lead">{lead}</p>
     <div class="prose">
       {blocks.map((b) => (b.tag === 'h2' ? <h2 set:html={inline(b.text)} /> : <p set:html={inline(b.text)} />))}
     </div>

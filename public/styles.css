@@ -1357,6 +1357,19 @@ a { color: inherit; }
 .wb-misc-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 @media (max-width: 720px) { .wb-grid-misc { grid-template-columns: 1fr; } }
 
+/* 分类管理（独立模块）：单卡居中，宽度略宽于「其他功能」单列，长分类名不易折行 */
+#mod-categories .wb-card { max-width: 680px; }
+
+/* 关于页面文案：中英各一组输入 + 操作按钮行 */
+.wb-about-acts { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+.wb-about-acts .btn { flex: 1; }
+#about-card .wb-field textarea {
+  padding: 8px 12px; font-size: 13.5px; font-family: inherit; line-height: 1.7;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text);
+  resize: vertical;
+}
+#about-card .wb-field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
 /* 分类管理 */
 .wb-cat-note { margin: 0 0 12px; }
 .wb-cat-item { padding: 12px 4px; border-bottom: 1px solid var(--border); }

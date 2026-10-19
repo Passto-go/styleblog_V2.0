@@ -51,6 +51,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         <button type="button" data-mod="write" class="on">文章管理</button>
         <button type="button" data-mod="files">文件管理</button>
         <button type="button" data-mod="comments">评论管理</button>
+        <button type="button" data-mod="categories">分类管理</button>
         <button type="button" data-mod="misc">其他功能</button>
       </nav>
 
@@ -229,6 +230,30 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       </section>
 
       <!-- ============ 模块三：其他功能 ============ -->
+      <!-- ============ 模块四：分类管理（独立模块） ============ -->
+      <section id="mod-categories" class="wb-module" hidden>
+        <div class="wb-card" id="cat-card">
+          <div class="wb-side-head">
+            <strong>分类管理</strong>
+            <span id="cat-count" class="wb-hint"></span>
+          </div>
+          <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。合并/删除同理会同步文章。</p>
+          <button id="cat-add-btn" class="wb-cat-add" type="button">＋ 新增分类</button>
+          <ul id="cat-list-manage" class="wb-list"></ul>
+          <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
+            <input id="cat-add-name" class="wb-cat" placeholder="中文名（必填），如：技术随笔" />
+            <input id="cat-add-name-en" class="wb-cat" placeholder="English name（可选，如 Tech Notes）" />
+            <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
+            <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
+            <span class="wb-hint wb-cat-new-hint">中文名必填；EN 留空则英文前台回退显示中文名。Slug＝网址里的后缀，中英共用同一个。</span>
+            <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
+            <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
+            <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 模块五：其他功能 ============ -->
       <section id="mod-misc" class="wb-module" hidden>
         <div class="wb-grid-misc">
           <div class="wb-misc-col">
@@ -304,24 +329,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
           </div>
 
           <div class="wb-misc-col">
-            <div class="wb-card" id="cat-card">
-              <div class="wb-side-head">
-                <strong>分类管理</strong>
-                <span id="cat-count" class="wb-hint"></span>
+            <div class="wb-card" id="about-card">
+              <div class="wb-side-head"><strong>关于页面文案</strong></div>
+              <p class="wb-hint wb-cat-note">编辑「关于」页文字，保存后刷新前台即时生效，不走代码发布。正文支持 <strong>**粗体**</strong>、<strong>[文字](网址)</strong>、<strong>## 小标题</strong>，空行分段；引导语为纯文本单行。全部留空则回退源码内置的默认文案。</p>
+              <label class="wb-field">中文 — 引导语<input id="about-lead-zh" placeholder="如：你好，我是老一贯。" /></label>
+              <label class="wb-field">中文 — 正文<textarea id="about-body-zh" rows="10" placeholder="## 小标题&#10;&#10;正文段落…"></textarea></label>
+              <label class="wb-field">English — Lead<input id="about-lead-en" placeholder="Hi, I'm 老一贯." /></label>
+              <label class="wb-field">English — Body<textarea id="about-body-en" rows="10" placeholder="## Heading&#10;&#10;Paragraph…"></textarea></label>
+              <div class="wb-about-acts">
+                <button id="about-save" class="btn" type="button">保存文案</button>
+                <button id="about-reset" class="wb-cat-act wb-cat-del" type="button">恢复默认</button>
               </div>
-              <p class="wb-hint wb-cat-note">重命名会同步修改该分类下所有文章的分类名与 URL（slug）；改名后旧的分类链接将失效。合并/删除同理会同步文章。</p>
-              <button id="cat-add-btn" class="wb-cat-add" type="button">＋ 新增分类</button>
-              <ul id="cat-list-manage" class="wb-list"></ul>
-              <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
-                <input id="cat-add-name" class="wb-cat" placeholder="中文名（必填），如：技术随笔" />
-                <input id="cat-add-name-en" class="wb-cat" placeholder="English name（可选，如 Tech Notes）" />
-                <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
-                <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
-                <span class="wb-hint wb-cat-new-hint">中文名必填；EN 留空则英文前台回退显示中文名。Slug＝网址里的后缀，中英共用同一个。</span>
-                <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
-                <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
-                <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
-              </div>
+              <span id="about-msg" class="wb-hint" role="status" aria-live="polite"></span>
             </div>
           </div>
         </div>
@@ -402,8 +421,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     loadComments();
   }
 
-  // ---------- 模块切换（文章管理 / 评论管理 / 其他功能） ----------
-  const MODULES = ['write', 'files', 'comments', 'misc'];
+  // ---------- 模块切换（文章管理 / 文件管理 / 评论管理 / 分类管理 / 其他功能） ----------
+  const MODULES = ['write', 'files', 'comments', 'categories', 'misc'];
   function switchModule(name) {
     if (!MODULES.includes(name)) return;
     closeEditor(); // 切换模块时收起编辑器弹窗，避免遮罩/滚动锁残留
@@ -413,7 +432,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     });
     if (name === 'comments') loadComments();
     if (name === 'files') loadMedia();
-    if (name === 'misc') { loadCountdown(); loadExcerptSettings(); loadCatManage(); loadAvatar(); }
+    if (name === 'categories') loadCatManage();
+    if (name === 'misc') { loadCountdown(); loadExcerptSettings(); loadAbout(); loadAvatar(); }
   }
 
   // ---------- 首页倒计时（存于 site_settings） ----------
@@ -474,6 +494,49 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       });
     if (error) { msg.textContent = '保存失败：' + error.message; msg.dataset.kind = 'err'; return; }
     msg.textContent = '已保存 ✓ 对之后留空摘要的发布生效'; msg.dataset.kind = 'ok';
+  }
+
+  // ---------- 关于页文案（存于 site_settings，键 about_content） ----------
+  // 与倒计时/摘要同款存储机制：后台保存 → 前台 SSR 每请求现读 → 刷新即生效，不走代码发布。
+  // 值形如 { zh: { lead, body }, en: { lead, body } }；某语言/某字段为空时，
+  // 前台回退 src/i18n/ui.js 的内置文案（见 AboutPage.astro），所以清空不会把页面弄空。
+  async function loadAbout() {
+    let v = null;
+    try {
+      const { data, error } = await supabase
+        .from('site_settings').select('value').eq('key', 'about_content').maybeSingle();
+      if (!error && data?.value) v = data.value;
+    } catch {}
+    $('about-lead-zh').value = (v?.zh?.lead) || '';
+    $('about-body-zh').value = (v?.zh?.body) || '';
+    $('about-lead-en').value = (v?.en?.lead) || '';
+    $('about-body-en').value = (v?.en?.body) || '';
+  }
+
+  async function saveAbout() {
+    const msg = $('about-msg');
+    msg.textContent = '保存中…'; msg.dataset.kind = '';
+    const { error } = await supabase
+      .from('site_settings')
+      .upsert({
+        key: 'about_content',
+        value: {
+          zh: { lead: $('about-lead-zh').value.trim(), body: $('about-body-zh').value },
+          en: { lead: $('about-lead-en').value.trim(), body: $('about-body-en').value },
+        },
+        updated_at: new Date().toISOString(),
+      });
+    if (error) { msg.textContent = '保存失败：' + error.message; msg.dataset.kind = 'err'; }
+    else { msg.textContent = '已保存 ✓ 刷新「关于」页即可生效'; msg.dataset.kind = 'ok'; }
+  }
+
+  async function resetAbout() {
+    if (!confirm('恢复默认将删除已保存文案，「关于」页回到源码内置版本。确定继续？')) return;
+    const msg = $('about-msg');
+    const { error } = await supabase.from('site_settings').delete().eq('key', 'about_content');
+    if (error) { msg.textContent = '恢复失败：' + error.message; msg.dataset.kind = 'err'; return; }
+    await loadAbout();
+    msg.textContent = '已恢复默认文案 ✓'; msg.dataset.kind = 'ok';
   }
 
   // ---------- 站点设置 → 头像 ----------
@@ -2842,7 +2905,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       showLogin();
     });
 
-    // 模块导航：文章管理 / 评论管理 / 其他功能
+    // 模块导航：文章管理 / 文件管理 / 评论管理 / 分类管理 / 其他功能
     $('wb-modnav').querySelectorAll('button').forEach((b) => {
       b.onclick = () => switchModule(b.dataset.mod);
     });
@@ -2855,6 +2918,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('editor-close').onclick = closeEditor;
     $('cd-save').onclick = saveCountdown;
     $('ex-save').onclick = saveExcerptSettings;
+    $('about-save').onclick = saveAbout;
+    $('about-reset').onclick = resetAbout;
     $('ai-excerpt-btn').onclick = () => aiGenerateExcerpt();
 
     // 站点设置 → 头像：选择文件（隐藏 input 承接）/ 上传 / 删除
