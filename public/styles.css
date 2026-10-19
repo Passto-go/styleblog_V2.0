@@ -223,14 +223,22 @@ a { color: inherit; }
 
 /* ---------- 通用页面（关于/分类/归档/搜索） ---------- */
 .page { max-width: 760px; margin: 0 auto; padding: 56px 20px 64px; }
-.page-title { font-size: 30px; margin: 0 0 8px; color: var(--text-strong); }
-.lead { color: var(--muted); font-size: 16px; margin: 0 0 28px; }
-.prose p { margin: 1.1em 0; }
-.prose h2 { font-size: 19px; margin: 1.9em 0 0.5em; color: var(--text-strong); line-height: 1.4; }
+.page-title { font-size: 32px; margin: 0 0 10px; color: var(--text-strong); letter-spacing: -0.01em; }
+.lead { color: var(--muted); font-size: 17px; margin: 0 0 28px; line-height: 1.7; }
+.prose p { margin: 1.1em 0; font-size: 17px; line-height: 1.8; }
+.prose h2 { font-size: 21px; margin: 1.9em 0 0.5em; color: var(--text-strong); line-height: 1.4; }
 .prose h2:first-child { margin-top: 0; }
 .prose a { color: var(--accent); text-decoration: none; }
 .prose a:hover { text-decoration: underline; }
 .prose strong { font-weight: 600; color: var(--text-strong); }
+/* 移动端：标题与正文按比例收一档，页边距收紧，长文阅读更舒适 */
+@media (max-width: 640px) {
+  .page { padding: 36px 18px 48px; }
+  .page-title { font-size: 26px; }
+  .lead { font-size: 16px; }
+  .prose p { font-size: 16px; line-height: 1.75; }
+  .prose h2 { font-size: 19px; }
+}
 .crumbs { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
 .crumbs a { color: var(--muted); text-decoration: none; }
 .crumbs a:hover { color: var(--accent); }
