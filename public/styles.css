@@ -784,6 +784,9 @@ a { color: inherit; }
 .wb-enc-toggle input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .wb-enc-fields { display: grid; gap: 8px; margin-top: 10px; }
 .wb-enc-fields input { width: 100%; }
+/* teaser 复选框：与主开关同款但略降字重，避免抢焦点 */
+.wb-enc-toggle-row { border-top: 1px dashed var(--border); padding-top: 10px; }
+.wb-enc-toggle-row .wb-enc-toggle { font-weight: 500; }
 .wb-item-title.is-trash { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .wb-trash-left { font-size: 11px; color: #b45309; font-weight: 600; }
 [data-theme="dark"] .wb-trash-left { color: #e08a4a; }

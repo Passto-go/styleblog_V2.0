@@ -22,12 +22,14 @@ if (versions && versions.encrypted) {
   Astro.response.headers.set('Cache-Control', 'private, no-store');
 }
 
-// 未解锁时剥离正文与摘要（pass_hash 已在 normalize 层剔除，此处进一步不传内容）
+// 未解锁时剥离正文与摘要（pass_hash 已在 normalize 层剔除，此处进一步不传内容）。
+// teaser 模式（versions.listVisible）例外：摘要本就设计为公开露出，锁定态也展示，
+// 与「列表可见、点击输密码」的承诺一致；正文在任何解锁态下都不出 HTML。
 const safePost = versions
   ? {
       ...versions.post,
       content: unlocked ? versions.post.content : '',
-      excerpt: unlocked ? versions.post.excerpt : '',
+      excerpt: unlocked || versions.listVisible ? versions.post.excerpt : '',
     }
   : null;
 ---
@@ -37,6 +39,7 @@ const safePost = versions
     post={safePost}
     versions={versions}
     unlocked={unlocked}
+    listVisible={!!versions.listVisible}
     passHint={passHint}
   />
 ) : (

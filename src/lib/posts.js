@@ -25,7 +25,7 @@ function sbClient(extra) {
 // ② 显式列举让「缺列」可被识别，从而在未执行旧迁移的库上逐级降级。
 // 注意：将来给 posts 加列且前端要读时，需同步补进本清单。
 const POST_COLS =
-  'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint';
+  'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint,list_visible';
 
 // 构建时（服务端）从 Supabase 拉取已发布文章。
 // 未配置或拉取失败则回退到本地示例数据，保证站点始终能构建。
@@ -83,14 +83,19 @@ function normalize(p) {
   };
 }
 
-// 加密文章按「基准 slug」整组排除：任一语言版本加密，整篇（含其它语言行的
-// 标题/摘要）都不进入任何公开列表——标题与摘要同样算泄漏，与读者侧
-// 「同组同一把锁」口径一致。SQL 未执行（无 is_encrypted 列）时全部通过。
+// 列表可见性（组级口径）：
+//   · 未加密 → 正常进列表
+//   · 加密 + list_visible（teaser 模式）→ 进列表，标题/摘要露出，正文仍须密码
+//   · 加密 + 非 teaser → 整组从所有公开列表排除（标题与摘要同样算泄漏）
+// 防御：组内任一行是「非 teaser 加密」即整组隐身（防只开一半的中间态泄漏）。
+// 列缺失（未执行 teaser 迁移）时 list_visible 为 undefined → 视作 false → 旧行为。
 function excludeEncrypted(all) {
-  const encBases = new Set();
-  for (const p of all) if (p.is_encrypted) encBases.add(baseSlug(p.slug));
-  if (!encBases.size) return all;
-  return all.filter((p) => !encBases.has(baseSlug(p.slug)));
+  const hidden = new Set();
+  for (const p of all) {
+    if (p.is_encrypted && p.list_visible !== true) hidden.add(baseSlug(p.slug));
+  }
+  if (!hidden.size) return all;
+  return all.filter((p) => !hidden.has(baseSlug(p.slug)));
 }
 
 // 文章为「语言中立」：同一篇文章在所有语言视图下都展示，仅 UI 文案随语言切换。
@@ -98,7 +103,8 @@ function excludeEncrypted(all) {
 // 历史遗留的 hello-ja 也归一到 hello），每个语言视图只挑选最匹配的一个版本展示，
 // 避免列表出现同篇多语言的重复条目。
 export async function getPosts(lang = 'zh') {
-  // 加密文章不进入任何公开列表（防泄漏：列表/归档/分类/首页均经此函数）
+  // 非 teaser 加密文章不进入任何公开列表（防泄漏：列表/归档/分类/首页均经此函数）；
+  // teaser 加密文章（list_visible）按设计露出标题与摘要，正文仍由详情页密码门把关。
   const all = excludeEncrypted((await fetchAll()).map(normalize));
   return pickPerArticle(all, lang);
 }
@@ -249,6 +255,7 @@ export async function getPostWithVersions(slug, lang = 'zh') {
   const post = (displayLang && pickLangVersion(group, displayLang)) || group[0];
   // 加密按「组」判定：任一语言版本加密，整篇所有语言页都需密码解锁。
   // （只加密中文行时，英文行若单独放行会直接露出正文——组级锁死堵住该路径）
+  // listVisible：teaser 模式——列表露标题摘要、详情页未解锁也给摘要看，正文照锁。
   const encRow = group.find((x) => x.is_encrypted);
   return {
     post,
@@ -257,6 +264,7 @@ export async function getPostWithVersions(slug, lang = 'zh') {
     siblings: { en: versionSlug('en') },
     base,
     encrypted: !!encRow,
+    listVisible: !!(encRow && encRow.list_visible),
     passHint: (encRow && encRow.pass_hint) || '',
   };
 }

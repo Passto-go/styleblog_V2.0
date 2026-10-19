@@ -11,7 +11,7 @@ import Countdown from '../Countdown.astro';
 import Comments from '../Comments.astro';
 import Share from '../Share.astro';
 
-const { lang, post, versions, unlocked = false, passHint = '' } = Astro.props;
+const { lang, post, versions, unlocked = false, listVisible = false, passHint = '' } = Astro.props;
 const t = useTranslations(lang);
 const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
@@ -131,7 +131,7 @@ const missingNotice = (() => {
           )}
         </aside>
       )}
-      {unlocked && post.excerpt && <p class="post-lead">{post.excerpt}</p>}
+      {(unlocked || listVisible) && post.excerpt && <p class="post-lead">{post.excerpt}</p>}
       {/* 加密文章未解锁：不渲染正文，仅展示密码框（正文/附件/评论均不进 DOM） */}
       {unlocked ? (
         <div class="content" data-post={postBaseSlug} set:html={html} />

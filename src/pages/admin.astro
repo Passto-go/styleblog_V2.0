@@ -131,10 +131,14 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                   <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
                   <div class="wb-more-field wb-enc">
                     <label class="wb-enc-toggle" for="f-encrypted"><input type="checkbox" id="f-encrypted" /> 启用访问加密</label>
-                    <small class="wb-hint">开启后前台文章页先显示密码框，密码正确才展示正文；文章不进列表/归档/搜索/sitemap，搜索引擎不收录。多语言版本共享同一密码（按文章基准 slug）。</small>
+                    <small class="wb-hint">开启后前台文章页先显示密码框，密码正确才展示正文；多语言版本共享同一密码（按文章基准 slug）。</small>
                     <div id="enc-fields" class="wb-enc-fields" hidden>
                       <input id="f-enc-pw" type="password" placeholder="设置访问密码（留空 = 不修改原密码）" autocomplete="new-password" />
                       <input id="f-enc-hint" type="text" placeholder="密码提示语（可选，如：生日八位）" maxlength="60" />
+                      <div id="enc-listvisible-row" class="wb-enc-toggle-row">
+                        <label class="wb-enc-toggle" for="f-enc-listvisible"><input type="checkbox" id="f-enc-listvisible" /> 列表显示标题摘要（teaser）</label>
+                        <small class="wb-hint">勾选后文章仍进入列表/归档/分类/首页/搜索/RSS，露出标题与摘要，点击需输密码看正文；不勾选则整篇从所有列表隐身（标题摘要同样保密）。改动对多语言版本同时生效。</small>
+                      </div>
                       <small class="wb-hint">密码在数据库端哈希保存，后台与前台均不可见；取消勾选并保存即解除加密。</small>
                     </div>
                   </div>
@@ -366,7 +370,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   let supabase = null;
 
   // 当前编辑态
-  const state = { id: '', slug: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false, wasEncrypted: false, passHint: '' };
+  const state = { id: '', slug: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false, wasEncrypted: false, passHint: '', listVisible: false, listVisibleSupported: true };
 
   // 本会话上传、但上传时文章尚无 slug 的附件 path：保存成功后按最终 slug 补关联 post_slug
   const pendingAttach = new Set();
@@ -1912,10 +1916,16 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('f-content').value = p.content || '';
     // 访问加密回显：开关与提示语可回显；密码永不回显（DB 端哈希，取了也看不出原文），
     // 留空即「不修改原密码」。wasEncrypted/passHint 记录保存前的状态，供 persist 判增量。
+    // listVisibleSupported：库里有 list_visible 列才显示 teaser 复选框（未执行 teaser 迁移时隐藏）。
+    // 支持性由 loadList 依据全量数据判定（新建文章时 p 为空对象，不能据此判定），此处只重置勾选态。
     $('f-encrypted').checked = !!p.is_encrypted;
     $('f-enc-pw').value = '';
     $('f-enc-hint').value = p.pass_hint || '';
     state.wasEncrypted = !!p.is_encrypted;
+    state.listVisible = p.list_visible === true;
+    $('f-enc-listvisible').checked = state.listVisible;
+    if (p.list_visible !== undefined) state.listVisibleSupported = true;
+    $('enc-listvisible-row').hidden = !state.listVisibleSupported;
     state.passHint = p.pass_hint || '';
     toggleEncFields();
     state.lang = p.lang || 'zh';
@@ -2233,7 +2243,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         // .select('id')：insert 默认返回整行（含 pass_hash，已 revoke 会报权限错），
         // 显式只要 id。
         const r = await supabase.from('posts')
-          .insert({ ...row, is_encrypted: state.wasEncrypted || undefined, published_at: row.published_at || new Date().toISOString() })
+          .insert({ ...row, is_encrypted: state.wasEncrypted || undefined, list_visible: state.listVisible || undefined, published_at: row.published_at || new Date().toISOString() })
           .select('id');
         error = r.error;
         if (!error && r.data?.[0]) state.id = r.data[0].id;
@@ -2260,23 +2270,41 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         refreshAttachList();
       }
       // 访问加密：经 SECURITY DEFINER RPC 走（密码 DB 端 bcrypt 哈希，绝不进普通 update）。
-      // 三种路径：开加密+填新密码 → post_set_password（同时写提示语）；
-      //           开加密+未填密码+原本已加密 → 仅更新提示语（普通 update，authenticated 有权限）；
-      //           取消勾选+原本已加密 → post_clear_encryption。
+      // 路径：
+      //   开加密+填新密码 → post_set_password（同时写提示语 + teaser 显隐）；
+      //   开加密+未填密码+原本已加密 → 提示语变了则普通 update；teaser 显隐变了则
+      //     post_set_list_visible（按 base 组级传播，中英行一致）；
+      //   开加密+未填密码+原本未加密 → 拦下要求先设密码；
+      //   取消勾选+原本已加密 → post_clear_encryption。
+      // 降级：库未执行 teaser 迁移时新签名不存在（PGRST202），退回 v2 三参调用——
+      //   密码照常设置，仅 teaser 不生效并明确提示，绝不阻断保存。
       // 新建分支里 state.id 已在 insert 后回填，此处两种场景都拿得到 id。
       if (!error) {
         const encOn = $('f-encrypted').checked;
         const encPw = $('f-enc-pw').value;
         const encHint = $('f-enc-hint').value.trim();
+        const encTeaser = $('f-enc-listvisible').checked;
+        const rpcNotFound = (e) => /could not find the function|PGRST202/i.test((e && e.message) || '');
+        let teaserPending = false;   // 勾了 teaser 但库不支持 → 保存后提示补跑 SQL
         try {
           if (encOn && encPw) {
             if (encPw.length < 4) { setMsg('访问密码至少 4 位', 'err'); return null; }
-            const { error: e2 } = await supabase.rpc('post_set_password', { p_id: state.id, p_pw: encPw, p_hint: encHint });
-            if (e2) throw e2;
+            let { error: e2 } = await supabase.rpc('post_set_password', { p_id: state.id, p_pw: encPw, p_hint: encHint, p_list_visible: encTeaser });
+            if (e2 && rpcNotFound(e2)) {
+              ({ error: e2 } = await supabase.rpc('post_set_password', { p_id: state.id, p_pw: encPw, p_hint: encHint }));
+              if (e2) throw e2;
+              if (encTeaser) teaserPending = true;
+            } else if (e2) { throw e2; }
           } else if (encOn && state.wasEncrypted) {
             if (encHint !== (state.passHint || '')) {
               const { error: e3 } = await supabase.from('posts').update({ pass_hint: encHint }).eq('id', state.id);
               if (e3) throw e3;
+            }
+            if (encTeaser !== state.listVisible) {
+              const { error: e5 } = await supabase.rpc('post_set_list_visible', { p_id: state.id, p_visible: encTeaser });
+              if (e5 && rpcNotFound(e5)) {
+                if (encTeaser) teaserPending = true;   // 想开开不了要提示；想关的旧库本就是关的
+              } else if (e5) { throw e5; }
             }
           } else if (encOn) {
             setMsg('请设置访问密码（至少 4 位）', 'err');
@@ -2291,6 +2319,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         }
         state.wasEncrypted = encOn;
         state.passHint = encHint;
+        state.listVisible = encOn ? encTeaser : false;
+        if (teaserPending) {
+          setMsg('密码已保存；但「列表显示标题摘要」需先在 Supabase 执行 supabase/encryption_teaser.sql', 'err');
+        }
       }
       // 新建分类：同步写入注册表（best-effort，categories 表未建也不影响文章发布）
       if (!error && $('f-category').value === '__new__' && row.category) {
@@ -2552,18 +2584,20 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     } catch (e) { /* 函数未部署或网络异常：忽略，不阻塞列表 */ }
 
     // 显式列清单（不含 pass_hash）：该列已对 anon/authenticated revoke，
-    // select('*') 会报权限错；显式列举同时兼容缺加密列的旧库（自动回退全列）。
-    const POST_COLS = 'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint';
+    // select('*') 会报权限错；显式列举同时兼容缺列的旧库（自动回退全列）。
+    const POST_COLS = 'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint,list_visible';
     let { data, error } = await supabase
       .from('posts').select(POST_COLS).order('published_at', { ascending: false });
     if (error && /does not exist/i.test(error.message || '')) {
-      // 旧库未执行 encryption.sql：回退全列（此时也没有 pass_hash 权限收窄）
+      // 旧库未执行 encryption.sql / teaser 迁移：回退全列（此时也没有 pass_hash 权限收窄）
       ({ data, error } = await supabase
         .from('posts').select('*').order('published_at', { ascending: false }));
     }
     if (error) { $('post-list').innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
     // pass_hash 不进入后台前端（双保险：查询层已不取该列，此处再挡一道）
     allPosts = (data || []).map(({ pass_hash, ...rest }) => rest);
+    // teaser 复选框的可用性：任一行带 list_visible 即说明库已执行 teaser 迁移
+    state.listVisibleSupported = allPosts.some((p) => p.list_visible !== undefined);
     loadCategoryOptions();
     renderList();
     updateLangState();

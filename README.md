@@ -26,7 +26,7 @@
 - **归档 / 分类 / 搜索**：按时间归档页、分类列表与分类详情页、纯前端站内搜索（读取 `/search-index.json`）。
 - **订阅与 SEO**：每语言独立的 RSS（`/rss.xml`、`/en/rss.xml`）、站点地图（`/sitemap-index.xml`）、canonical / Open Graph 元数据。
 - **小部件**：「今日寄语」（按语言每日轮换）、「倒计时」（目标日与名称由后台写入 `site_settings`）。
-- **文章加密**：单篇文章可设访问密码——bcrypt 哈希存库、HMAC 签名 cookie 维持解锁态，未解锁时正文/附件/评论全部不进入 HTML，不进列表/RSS/sitemap/搜索索引；页面带 `noindex` 与 `no-store`。
+- **文章加密**：单篇文章可设访问密码——bcrypt 哈希存库、HMAC 签名 cookie 维持解锁态，未解锁时正文/附件/评论全部不进入 HTML；可选 teaser 模式（列表露出标题摘要、点击输密码看正文）；默认不进列表/RSS/sitemap/搜索索引；页面带 `noindex` 与 `no-store`。
 - **体验细节**：深色模式、响应式布局、文章分享面板（微信 / 微博 / X / Telegram 等）、无译文提示。
 
 ### 后台管理界面（`/admin`，独立页面）
@@ -51,11 +51,12 @@
 单篇文章可设置访问密码，读者输对密码才能阅读正文：
 
 - **开启**：后台编辑器 →「更多设置」→ 勾选「启用访问加密」→ 填密码（≥4 位）与可选提示 → 保存（先存文章，再单独写密码，互不影响）。
-- **读者侧**：加密文章在列表 / 归档 / RSS / sitemap / 搜索索引中**完全不出现**；直接访问文章页只看到标题、元信息与密码框，输对密码后整页刷新呈现正文（30 天内免密）。
-- **多语言共享**：密码按「基准 slug」共享（中英文版同一把锁），任一线程解锁全线生效。
+- **读者侧（默认）**：加密文章在列表 / 归档 / RSS / sitemap / 搜索索引中**完全不出现**；直接访问文章页只看到标题、元信息与密码框，输对密码后整页刷新呈现正文（30 天内免密）。
+- **teaser 模式**：勾选「列表显示标题摘要」后，文章照常进入列表 / 归档 / 分类 / 首页 / 搜索 / RSS，露出标题与摘要，点击仍需输密码看正文（摘要公开、正文不公开；搜索索引只收录标题摘要，正文留空）。适合「预告型」私文：既吊胃口又不泄底。
+- **多语言共享**：密码与 teaser 显隐按「基准 slug」共享（中英文版同一把锁），任一线程解锁全线生效。
 - **关闭**：取消勾选保存即清除密码，文章恢复公开。
-- **安全设计**：密码以 bcrypt（pgcrypto）哈希落库，`pass_hash` 任何接口都不外泄；密码校验在数据库端完成；解锁态用 HMAC-SHA256 签名 cookie 标识，服务端本地校验无需查库；未解锁时正文、摘要、附件直链、评论区全部不进入 HTML；加密页带 `noindex` 与 `Cache-Control: private, no-store`，防爬取与边缘缓存误吐。
-- **依赖**：需先执行 `supabase/encryption.sql`，并配置服务端密钥 `UNLOCK_SECRET`（见配置章节）。
+- **安全设计**：密码以 bcrypt（pgcrypto）哈希落库，`pass_hash` 任何接口都不外泄；密码校验在数据库端完成；解锁态用 HMAC-SHA256 签名 cookie 标识，服务端本地校验无需查库；未解锁时正文、附件直链、评论区全部不进入 HTML；加密页带 `noindex` 与 `Cache-Control: private, no-store`，防爬取与边缘缓存误吐。
+- **依赖**：需先执行 `supabase/encryption.sql`，并配置服务端密钥 `UNLOCK_SECRET`（见配置章节）；teaser 模式另需执行 `supabase/encryption_teaser.sql`（增量，v2 之后）。
 
 ### 一键翻译（可选）
 后台管理界面可调用翻译接口，把文章译成英文 / 日文版本（需配置翻译 key，详见配置章节）。翻译走 **OpenAI 兼容协议**，可搭配任意兼容服务（Gemini / DeepSeek / 智谱 GLM 等）：换服务只需改 `TRANSLATE_BASE_URL` / `TRANSLATE_MODEL` 两个变量，代码零改动。长文自动按二级标题分段翻译（段间 2 秒间隔防限流），失败指数退避重试。
@@ -114,6 +115,7 @@ styleblog_V2.0/
 │  ├─ categories.sql        # 分类注册表 + 自愈回填（其次）
 │  ├─ posts_author.sql      # 给 posts 增加 author 列（文章作者字段）
 │  └─ encryption.sql        # 文章加密：三列 + 3 个 RPC（bcrypt 密码校验，可选）
+│  └─ encryption_teaser.sql # 加密 teaser 增量：list_visible 列 + 2 个 RPC（可选）
 ├─ public/
 │  ├─ styles.css            # 前台样式（含 .wb-* 后台作用域样式）
 │  ├─ avatar.png            # 头像（放入即启用）
@@ -149,6 +151,7 @@ npm run dev          # 打开 http://localhost:4321
    - **`supabase/categories.sql`**：建 `categories` 注册表，自愈历史脏数据，并把现有文章去重分类种子化进去。
    - **`supabase/posts_author.sql`**：给 `posts` 增加 `author` 列（文章作者字段；不加此列时后台「发布 / 存草稿」会报错）。
    - **`supabase/encryption.sql`**（可选，要用文章加密才需执行；**v2 起注意执行顺序：先部署代码再跑 SQL**）：给 `posts` 增加 `is_encrypted / pass_hash / pass_hint` 三列与 `post_check_password` 等 3 个 `security definer` RPC（启用 pgcrypto、bcrypt cost 10），把 anon 角色对 `pass_hash` 列的权限收窄（列级 revoke，防 anon 直连 REST 拖哈希）。v2 修复了首版在 Supabase 上 `crypt()` 不可解析（pgcrypto 预装在 `extensions` 模式）导致设密码/校验全部 500 的问题。
+   - **`supabase/encryption_teaser.sql`**（可选，加密的 teaser 模式增量；v2 之后执行）：增加 `list_visible` 列，`post_set_password` 增加 `p_list_visible` 参数（旧三参签名保留，向后兼容），新增 `post_set_list_visible` RPC。未执行时代码自动降级：teaser 复选框隐藏、加密文章维持全隐身，站点不报错。
 3. 进入 **Project Settings → API**，复制 `Project URL` 与 `anon public` key。
 4. 复制 `.env.example` 为 `.env` 并填入：
 
@@ -196,7 +199,7 @@ PUBLIC_SITE_URL=
 
 | 表 / 对象 | 作用 |
 |---|---|
-| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug`；加密扩展列 `is_encrypted / pass_hash(bcrypt) / pass_hint` 与 3 个 RPC 见 `supabase/encryption.sql` |
+| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug`；加密扩展列 `is_encrypted / pass_hash(bcrypt) / pass_hint / list_visible(teaser)` 与 RPC 见 `supabase/encryption.sql` / `supabase/encryption_teaser.sql` |
 | `comments` | 评论：`page / author / email / content / approved / rejected / parent_id / is_admin / delete_token`；含匿名提交与本人删除 RPC |
 | `site_settings` | 站点动态配置（如倒计时 `{name, target}`），键值对 `jsonb` |
 | `category_aliases` | 分类 Slug 旧→新映射，前台分类页 SSR 先查此表做 301 |
@@ -212,7 +215,7 @@ PUBLIC_SITE_URL=
 3. **评论管理**：审核待审评论（通过 / 驳回）、管理员回复、删除不当评论。
 4. **分类管理**：新增 / 重命名 / 合并 / 删除分类；重命名改动 Slug 后旧链接自动 301。
 5. **其他功能**：设置首页倒计时、摘要自动生成规则、上传头像；**「关于」页文案**：中英双语的引导语与正文在此编辑，支持 `**粗体**`、`[文字](网址)`、`## 小标题`、空行分段，保存后刷新 `/about`、`/en/about` 即时生效（存 `site_settings`，零部署零 commit）；「恢复默认」一键回到源码内置文案。
-6. **文章加密**（需已执行 `supabase/encryption.sql`）：编辑文章 →「更多设置」→ 勾选「启用访问加密」→ 填访问密码（≥4 位）与可选提示 → 保存。列表行出现 🔒 徽标；取消勾选保存即解除加密。
+6. **文章加密**（需已执行 `supabase/encryption.sql`）：编辑文章 →「更多设置」→ 勾选「启用访问加密」→ 填访问密码（≥4 位）与可选提示 → 保存。列表行出现 🔒 徽标；取消勾选保存即解除加密。勾选「列表显示标题摘要（teaser）」则文章保留在列表/搜索/RSS 中只露标题摘要（需已执行 `supabase/encryption_teaser.sql`，未执行时该复选框自动隐藏）。
 
 > 发布文章**不触发任何构建**；只有改代码才需推送并重新部署。
 
