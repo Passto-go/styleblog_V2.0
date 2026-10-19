@@ -55,8 +55,8 @@
 - **teaser 模式**：勾选「列表显示标题摘要」后，文章照常进入列表 / 归档 / 分类 / 首页 / 搜索 / RSS，露出标题与摘要，点击仍需输密码看正文（摘要公开、正文不公开；搜索索引只收录标题摘要，正文留空）。适合「预告型」私文：既吊胃口又不泄底。
 - **多语言共享**：密码与 teaser 显隐按「基准 slug」共享（中英文版同一把锁），任一线程解锁全线生效。
 - **关闭**：取消勾选保存即清除密码，文章恢复公开。
-- **安全设计**：密码以 bcrypt（pgcrypto）哈希落库，`pass_hash` 任何接口都不外泄；密码校验在数据库端完成；解锁态用 HMAC-SHA256 签名 cookie 标识，服务端本地校验无需查库；未解锁时正文、附件直链、评论区全部不进入 HTML；加密页带 `noindex` 与 `Cache-Control: private, no-store`，防爬取与边缘缓存误吐。
-- **依赖**：需先执行 `supabase/encryption.sql`，并配置服务端密钥 `UNLOCK_SECRET`（见配置章节）；teaser 模式另需执行 `supabase/encryption_teaser.sql`（增量，v2 之后）。
+- **安全设计**：密码以 bcrypt（pgcrypto）哈希落库于 `private.post_passwords`（PostgREST 不暴露私有模式，哈希不出现在任何接口；加固前存于 `posts.pass_hash` 列）；密码校验在数据库端完成；解锁态用 HMAC-SHA256 签名 cookie 标识，服务端本地校验无需查库；未解锁时正文、附件直链、评论区全部不进入 HTML；加密页带 `noindex` 与 `Cache-Control: private, no-store`，防爬取与边缘缓存误吐。
+- **依赖**：需先执行 `supabase/encryption.sql`，并配置服务端密钥 `UNLOCK_SECRET`（见配置章节）；teaser 模式另需执行 `supabase/encryption_teaser.sql`（增量，v2 之后）；哈希隔离加固另需执行 `supabase/encryption_hash_private.sql`（把哈希迁入 PostgREST 不暴露的私有表，推荐）。
 
 ### 一键翻译（可选）
 后台管理界面可调用翻译接口，把文章译成英文 / 日文版本（需配置翻译 key，详见配置章节）。翻译走 **OpenAI 兼容协议**，可搭配任意兼容服务（Gemini / DeepSeek / 智谱 GLM 等）：换服务只需改 `TRANSLATE_BASE_URL` / `TRANSLATE_MODEL` 两个变量，代码零改动。长文自动按二级标题分段翻译（段间 2 秒间隔防限流），失败指数退避重试。
@@ -116,6 +116,7 @@ styleblog_V2.0/
 │  ├─ posts_author.sql      # 给 posts 增加 author 列（文章作者字段）
 │  └─ encryption.sql        # 文章加密：三列 + 3 个 RPC（bcrypt 密码校验，可选）
 │  └─ encryption_teaser.sql # 加密 teaser 增量：list_visible 列 + 2 个 RPC（可选）
+│  └─ encryption_hash_private.sql # 哈希隔离：pass_hash 迁入 private.post_passwords（可选，encryption 之后）
 ├─ public/
 │  ├─ styles.css            # 前台样式（含 .wb-* 后台作用域样式）
 │  ├─ avatar.png            # 头像（放入即启用）
@@ -152,6 +153,7 @@ npm run dev          # 打开 http://localhost:4321
    - **`supabase/posts_author.sql`**：给 `posts` 增加 `author` 列（文章作者字段；不加此列时后台「发布 / 存草稿」会报错）。
    - **`supabase/encryption.sql`**（可选，要用文章加密才需执行；**v2 起注意执行顺序：先部署代码再跑 SQL**）：给 `posts` 增加 `is_encrypted / pass_hash / pass_hint` 三列与 `post_check_password` 等 3 个 `security definer` RPC（启用 pgcrypto、bcrypt cost 10），把 anon 角色对 `pass_hash` 列的权限收窄（列级 revoke，防 anon 直连 REST 拖哈希）。v2 修复了首版在 Supabase 上 `crypt()` 不可解析（pgcrypto 预装在 `extensions` 模式）导致设密码/校验全部 500 的问题。
    - **`supabase/encryption_teaser.sql`**（可选，加密的 teaser 模式增量；v2 之后执行）：增加 `list_visible` 列，`post_set_password` 增加 `p_list_visible` 参数（旧三参签名保留，向后兼容），新增 `post_set_list_visible` RPC。未执行时代码自动降级：teaser 复选框隐藏、加密文章维持全隐身，站点不报错。
+   - **`supabase/encryption_hash_private.sql`**（可选，哈希隔离加固；encryption 之后执行）：把 `posts.pass_hash` 整体迁入 `private.post_passwords`（PostgREST 默认只暴露 `public`，私有表 API 层不可见；不对 anon/authenticated 授予任何权限并开 RLS；读写全部经 security definer 函数），随后删除 `posts.pass_hash` 列——哈希暴露面归零，且不再依赖列级 revoke。函数签名不变，RPC 调用方与前台无感；存量哈希自动迁移。幂等可重复执行。
 3. 进入 **Project Settings → API**，复制 `Project URL` 与 `anon public` key。
 4. 复制 `.env.example` 为 `.env` 并填入：
 
@@ -199,7 +201,7 @@ PUBLIC_SITE_URL=
 
 | 表 / 对象 | 作用 |
 |---|---|
-| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug`；加密扩展列 `is_encrypted / pass_hash(bcrypt) / pass_hint / list_visible(teaser)` 与 RPC 见 `supabase/encryption.sql` / `supabase/encryption_teaser.sql` |
+| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug`；加密扩展列 `is_encrypted / pass_hint / list_visible(teaser)`，bcrypt 哈希存于 `private.post_passwords`（执行 `supabase/encryption_hash_private.sql` 后 `pass_hash` 列迁出并删除）；RPC 见 `supabase/encryption.sql` / `encryption_teaser.sql` / `encryption_hash_private.sql` |
 | `comments` | 评论：`page / author / email / content / approved / rejected / parent_id / is_admin / delete_token`；含匿名提交与本人删除 RPC |
 | `site_settings` | 站点动态配置（如倒计时 `{name, target}`），键值对 `jsonb` |
 | `category_aliases` | 分类 Slug 旧→新映射，前台分类页 SSR 先查此表做 301 |
