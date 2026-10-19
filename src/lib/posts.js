@@ -50,14 +50,28 @@ async function fetchAll() {
 const byDateDesc = (a, b) =>
   new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
 
-// 兼容 Supabase(下划线字段)与本地示例(camelCase)，统一成 camelCase
+// 兼容 Supabase(下划线字段)与本地示例(camelCase)，统一成 camelCase。
+// 安全：pass_hash 绝不向前端透传——它已在数据库端用 pgcrypto 哈希，且比对封装在
+// SECURITY DEFINER 函数内；这里再挡一道，任何经由此函数的文章对象都不含 pass_hash。
+// is_encrypted / pass_hint 可安全暴露给渲染层（前者决定弹密码框，后者用于提示语）。
 function normalize(p) {
+  const { pass_hash, ...safe } = p;
   return {
-    ...p,
-    lang: p.lang || 'zh',
-    category: p.category || null,
-    categorySlug: p.category_slug || p.categorySlug || 'uncategorized',
+    ...safe,
+    lang: safe.lang || 'zh',
+    category: safe.category || null,
+    categorySlug: safe.category_slug || safe.categorySlug || 'uncategorized',
   };
+}
+
+// 加密文章按「基准 slug」整组排除：任一语言版本加密，整篇（含其它语言行的
+// 标题/摘要）都不进入任何公开列表——标题与摘要同样算泄漏，与读者侧
+// 「同组同一把锁」口径一致。SQL 未执行（无 is_encrypted 列）时全部通过。
+function excludeEncrypted(all) {
+  const encBases = new Set();
+  for (const p of all) if (p.is_encrypted) encBases.add(baseSlug(p.slug));
+  if (!encBases.size) return all;
+  return all.filter((p) => !encBases.has(baseSlug(p.slug)));
 }
 
 // 文章为「语言中立」：同一篇文章在所有语言视图下都展示，仅 UI 文案随语言切换。
@@ -65,24 +79,27 @@ function normalize(p) {
 // 历史遗留的 hello-ja 也归一到 hello），每个语言视图只挑选最匹配的一个版本展示，
 // 避免列表出现同篇多语言的重复条目。
 export async function getPosts(lang = 'zh') {
-  const all = (await fetchAll()).map(normalize);
+  // 加密文章不进入任何公开列表（防泄漏：列表/归档/分类/首页均经此函数）
+  const all = excludeEncrypted((await fetchAll()).map(normalize));
   return pickPerArticle(all, lang);
 }
 
 export async function getAllPosts(lang = 'zh') {
-  return pickPerArticle((await fetchAll()).map(normalize), lang);
+  return pickPerArticle(excludeEncrypted((await fetchAll()).map(normalize)), lang);
 }
 
 // sitemap / RSS 等需要覆盖全部语言版本的场景：不按语言挑选，返回全部已发布版本。
+// 但加密文章仍须排除（noindex + 不进 sitemap/RSS，避免 URL 与元数据外泄）。
 export async function getAllPostsEveryLang() {
-  return (await fetchAll()).map(normalize);
+  return excludeEncrypted((await fetchAll()).map(normalize));
 }
 
 // 全部出现过的分类 slug（含注册表里 0 篇文章的分类），供 sitemap 等枚举使用。
 export async function getAllCategorySlugs() {
   const slugs = new Set();
-  for (const p of await fetchAll()) {
-    slugs.add(normalize(p).categorySlug || 'uncategorized');
+  // 加密文章的分类不进入 sitemap/分类枚举（否则出现只有加密文章的空分类页）
+  for (const p of excludeEncrypted((await fetchAll()).map(normalize))) {
+    slugs.add(p.categorySlug || 'uncategorized');
   }
   try {
     const supabase = sbClient();
@@ -211,12 +228,17 @@ export async function getPostWithVersions(slug, lang = 'zh') {
   const available = { en: hasVersion(group, base, 'en') };
   const displayLang = pickDisplayLang(group, base, lang);
   const post = (displayLang && pickLangVersion(group, displayLang)) || group[0];
+  // 加密按「组」判定：任一语言版本加密，整篇所有语言页都需密码解锁。
+  // （只加密中文行时，英文行若单独放行会直接露出正文——组级锁死堵住该路径）
+  const encRow = group.find((x) => x.is_encrypted);
   return {
     post,
     displayLang: displayLang || 'zh',
     available,
     siblings: { en: versionSlug('en') },
     base,
+    encrypted: !!encRow,
+    passHint: (encRow && encRow.pass_hint) || '',
   };
 }
 

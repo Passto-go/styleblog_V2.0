@@ -26,6 +26,7 @@
 - **归档 / 分类 / 搜索**：按时间归档页、分类列表与分类详情页、纯前端站内搜索（读取 `/search-index.json`）。
 - **订阅与 SEO**：每语言独立的 RSS（`/rss.xml`、`/en/rss.xml`）、站点地图（`/sitemap-index.xml`）、canonical / Open Graph 元数据。
 - **小部件**：「今日寄语」（按语言每日轮换）、「倒计时」（目标日与名称由后台写入 `site_settings`）。
+- **文章加密**：单篇文章可设访问密码——bcrypt 哈希存库、HMAC 签名 cookie 维持解锁态，未解锁时正文/附件/评论全部不进入 HTML，不进列表/RSS/sitemap/搜索索引；页面带 `noindex` 与 `no-store`。
 - **体验细节**：深色模式、响应式布局、文章分享面板（微信 / 微博 / X / Telegram 等）、无译文提示。
 
 ### 后台管理界面（`/admin`，独立页面）
@@ -33,7 +34,7 @@
 
 | 模块 | 能力 |
 |---|---|
-| **文章管理** | 文章列表**每个「篇」只占一行**：同一篇文章的各语言版本（zh/en）合并显示，语言以可点击标签排列在同行（点标签直接载入该语言版进编辑器）；标题链接**默认跳中文页面**；行尾「编辑 / 删除」（始终同行排列、不换行——「编辑」打开中文版，删除仅删中文版）；列表右侧「＋ 新建文章」；支持「全部 / 已发布 / 草稿」筛选与标题搜索（跨语言版本命中）。编辑器默认隐藏，仅点「＋ 新建文章」或行内「编辑」时以弹窗出现（点右上角 ✕ 关闭，点空白处或按 Esc 均不会关闭，防止误触丢失未保存内容），内含标题、语言、分类下拉（可新建）、作者、状态、Markdown 实时预览、一键翻译；「更多设置」内可**修改发布时间**（datetime 选择器，回填当前时间；留空保存则保持原时间——前台展示、首页/归档排序、RSS 的 pubDate 随之更新） |
+| **文章管理** | 文章列表**每个「篇」只占一行**：同一篇文章的各语言版本（zh/en）合并显示，语言以可点击标签排列在同行（点标签直接载入该语言版进编辑器）；标题链接**默认跳中文页面**；行尾「编辑 / 删除」（始终同行排列、不换行——「编辑」打开中文版，删除仅删中文版）；列表右侧「＋ 新建文章」；支持「全部 / 已发布 / 草稿」筛选与标题搜索（跨语言版本命中）。编辑器默认隐藏，仅点「＋ 新建文章」或行内「编辑」时以弹窗出现（点右上角 ✕ 关闭，点空白处或按 Esc 均不会关闭，防止误触丢失未保存内容），内含标题、语言、分类下拉（可新建）、作者、状态、Markdown 实时预览、一键翻译；「更多设置」内可**修改发布时间**（datetime 选择器，回填当前时间；留空保存则保持原时间——前台展示、首页/归档排序、RSS 的 pubDate 随之更新）与**启用访问加密**（设密码后读者需输密码才能看正文，详见「文章加密」小节） |
 | **评论管理** | 查看全部评论（含待审 / 未通过）；审核（通过 / 驳回）、管理员回复（嵌套）、删除；「我的评论」面板凭令牌管理自己提交的评论 |
 | **其他功能** | 倒计时配置（目标日 + 事件名）；分类管理（新增 / 重命名 / 合并 / 删除，严格 301 联动） |
 
@@ -44,6 +45,16 @@
 - **本人管理**：匿名提交时分配随机 `delete_token`（存浏览器 `localStorage`），凭令牌查看与删除自己的评论（经 `security definer` RPC，绕过 RLS 取回）。
 - **管理员回复**：后台回复标记为 `is_admin=true`，匿名用户无法伪造；支持多级嵌套。
 - **数据校验**：昵称/邮箱/内容长度与邮箱格式在数据库策略层（RLS）强制校验。
+
+### 文章加密（访问密码）
+单篇文章可设置访问密码，读者输对密码才能阅读正文：
+
+- **开启**：后台编辑器 →「更多设置」→ 勾选「启用访问加密」→ 填密码（≥4 位）与可选提示 → 保存（先存文章，再单独写密码，互不影响）。
+- **读者侧**：加密文章在列表 / 归档 / RSS / sitemap / 搜索索引中**完全不出现**；直接访问文章页只看到标题、元信息与密码框，输对密码后整页刷新呈现正文（30 天内免密）。
+- **多语言共享**：密码按「基准 slug」共享（中英文版同一把锁），任一线程解锁全线生效。
+- **关闭**：取消勾选保存即清除密码，文章恢复公开。
+- **安全设计**：密码以 bcrypt（pgcrypto）哈希落库，`pass_hash` 任何接口都不外泄；密码校验在数据库端完成；解锁态用 HMAC-SHA256 签名 cookie 标识，服务端本地校验无需查库；未解锁时正文、摘要、附件直链、评论区全部不进入 HTML；加密页带 `noindex` 与 `Cache-Control: private, no-store`，防爬取与边缘缓存误吐。
+- **依赖**：需先执行 `supabase/encryption.sql`，并配置服务端密钥 `UNLOCK_SECRET`（见配置章节）。
 
 ### 一键翻译（可选）
 后台管理界面可调用翻译接口，把文章译成英文 / 日文版本（需配置翻译 key，详见配置章节）。翻译走 **OpenAI 兼容协议**，可搭配任意兼容服务（Gemini / DeepSeek / 智谱 GLM 等）：换服务只需改 `TRANSLATE_BASE_URL` / `TRANSLATE_MODEL` 两个变量，代码零改动。长文自动按二级标题分段翻译（段间 2 秒间隔防限流），失败指数退避重试。
@@ -75,6 +86,7 @@ styleblog_V2.0/
 │  │  └─ sample.js          # 未配置 Supabase 时的示例文章（双语）
 │  ├─ lib/
 │  │  ├─ posts.js           # 从 Supabase 取文章 / 分类（注册表合并文章计数）/ 归档 / 别名 301
+│  │  ├─ unlock.ts          # 加密文章解锁态签名 / 校验（WebCrypto HMAC-SHA256 cookie）
 │  │  ├─ format.js          # 日期 / 分组格式化
 │  │  ├─ quotes.js          # 今日寄语按「年内第几天」轮换
 │  │  ├─ reading-time.js    # 预计阅读时长（CJK 字符 + 拉丁词混合加权，剔除代码块）
@@ -94,11 +106,13 @@ styleblog_V2.0/
 │     ├─ en/  ja/           # 英文 / 日文全量镜像（index/about/archive/categories/posts/search/rss）
 │     ├─ admin.astro         # 后台管理界面（三模块）
 │     ├─ api/translate.ts    # 一键翻译接口
+│     ├─ api/unlock.ts       # 文章解锁密码校验接口（DB 端 bcrypt 比对 + 签发签名 cookie）
 │     └─ 404.astro
 ├─ supabase/
 │  ├─ schema.sql            # 建表 + RLS + 图床 + 评论 RPC（最先跑）
 │  ├─ categories.sql        # 分类注册表 + 自愈回填（其次）
-│  └─ posts_author.sql      # 给 posts 增加 author 列（文章作者字段）
+│  ├─ posts_author.sql      # 给 posts 增加 author 列（文章作者字段）
+│  └─ encryption.sql        # 文章加密：三列 + 3 个 RPC（bcrypt 密码校验，可选）
 ├─ public/
 │  ├─ styles.css            # 前台样式（含 .wb-* 后台作用域样式）
 │  ├─ avatar.png            # 头像（放入即启用）
@@ -133,6 +147,7 @@ npm run dev          # 打开 http://localhost:4321
    - **`supabase/schema.sql`**：建 `posts` / `comments`（含 `add_comment`、`list_my_comments`、`delete_own_comment` 三个 RPC）/ `site_settings` / `category_aliases` 表，配置 RLS、图床桶 `images`、Realtime。
    - **`supabase/categories.sql`**：建 `categories` 注册表，自愈历史脏数据，并把现有文章去重分类种子化进去。
    - **`supabase/posts_author.sql`**：给 `posts` 增加 `author` 列（文章作者字段；不加此列时后台「发布 / 存草稿」会报错）。
+   - **`supabase/encryption.sql`**（可选，要用文章加密才需执行）：给 `posts` 增加 `is_encrypted / pass_hash / pass_hint` 三列与 `post_check_password` 等 3 个 `security definer` RPC（启用 pgcrypto），并把 anon 角色对这三列的权限收窄。
 3. 进入 **Project Settings → API**，复制 `Project URL` 与 `anon public` key。
 4. 复制 `.env.example` 为 `.env` 并填入：
 
@@ -156,6 +171,7 @@ PUBLIC_SITE_URL=
 | `PUBLIC_SUPABASE_URL` | 是 | Supabase 项目 URL（不要带 `/rest/v1/` 后缀） |
 | `PUBLIC_SUPABASE_ANON_KEY` | 是 | Supabase `anon` key，构建时内联进 Worker |
 | `PUBLIC_SITE_URL` | 建议 | 站点对外地址，影响 sitemap / RSS / canonical 准确性 |
+| `UNLOCK_SECRET` | 用加密才需 | 文章加密的解锁签名密钥，`openssl rand -hex 32` 生成；服务端专用不会进客户端包 |
 
 > ⚠️ `PUBLIC_*` 为**构建时内联**变量，值在 `npm run build` 那一刻写入产物；构建后改 Cloudflare 后台变量无法补救，务必先填真值再构建。
 
@@ -171,6 +187,7 @@ PUBLIC_SITE_URL=
 | 变量 | 说明 |
 |---|---|
 | `TRANSLATE_API_KEY` | 翻译服务密钥。Cloudflare 后台 → 项目 → **Settings → Variables and Secrets → Add（Type: Secret）** 添加；保存后 **Retry deployment** 生效，仅在服务端可见 |
+| `UNLOCK_SECRET` | 文章加密的解锁签名密钥（`openssl rand -hex 32`）。与 `TRANSLATE_API_KEY` 同样以 Secret 方式添加；代码为「运行时 Secret 优先、构建变量兜底」双路读取，配成 Secret 后**旋转密钥免重新构建** |
 
 ---
 
@@ -178,7 +195,7 @@ PUBLIC_SITE_URL=
 
 | 表 / 对象 | 作用 |
 |---|---|
-| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug` |
+| `posts` | 文章：`title / slug / content(MD) / excerpt / cover / author / published / published_at / lang / category / category_slug`；加密扩展列 `is_encrypted / pass_hash(bcrypt) / pass_hint` 与 3 个 RPC 见 `supabase/encryption.sql` |
 | `comments` | 评论：`page / author / email / content / approved / rejected / parent_id / is_admin / delete_token`；含匿名提交与本人删除 RPC |
 | `site_settings` | 站点动态配置（如倒计时 `{name, target}`），键值对 `jsonb` |
 | `category_aliases` | 分类 Slug 旧→新映射，前台分类页 SSR 先查此表做 301 |
@@ -193,6 +210,7 @@ PUBLIC_SITE_URL=
 2. **文章管理**：文章列表每个「篇」只占一行——同一篇文章的多语言版本合并显示，语言以标签排列在同行（点标签直接编辑该语言版），点标题默认打开中文页面，行尾可「编辑 / 删除」（始终同行排列、不换行）；用「全部 / 已发布 / 草稿」筛选（跨语言版本命中）。点「＋ 新建文章」或行内「编辑」才会弹出编辑器窗口（只能点右上角 ✕ 关闭；点空白处或按 Esc 不会关闭，防止误触丢失未保存内容），其中填标题、语言、分类（可新建）、作者、正文，「发布并上线」即写库生效，读者刷新即可见。**修改已发布文章的发布时间**：编辑器 →「更多设置」→「发布时间」，选新时间保存即可（前台展示、排序、RSS 同步更新；留空则保持原时间）。
 3. **评论管理**：审核待审评论（通过 / 驳回）、管理员回复、删除不当评论。
 4. **其他功能**：设置首页倒计时；管理分类（新增 / 重命名 / 合并 / 删除），重命名改动 Slug 后旧链接自动 301。
+5. **文章加密**（需已执行 `supabase/encryption.sql`）：编辑文章 →「更多设置」→ 勾选「启用访问加密」→ 填访问密码（≥4 位）与可选提示 → 保存。列表行出现 🔒 徽标；取消勾选保存即解除加密。
 
 > 发布文章**不触发任何构建**；只有改代码才需推送并重新部署。
 
@@ -224,7 +242,7 @@ PUBLIC_SITE_URL=
 
 1. Cloudflare Dashboard → **Workers & Pages → Create → Connect to Git**，选 **Workers**（不是 Pages），仓库 `main` 分支。
 2. 构建设置：Framework `Astro`，Build `npm run build`，Output `dist`，Deploy `npx wrangler deploy`（由 `wrangler.toml` 驱动）。
-3. **Settings → Builds → Build environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL` / `NODE_VERSION=22`。
+3. **Settings → Builds → Build environment variables** 添加 `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` / `PUBLIC_SITE_URL` / `NODE_VERSION=22`；如使用文章加密，另在 **Settings → Variables and Secrets** 添加 Secret `UNLOCK_SECRET`（值用 `openssl rand -hex 32` 生成）。
 4. **Save and Deploy** → 得到 `https://<项目名>.workers.dev`。
 5. 绑定自定义域名：**Settings → Triggers → Custom Domains**（免费 HTTPS）。
 

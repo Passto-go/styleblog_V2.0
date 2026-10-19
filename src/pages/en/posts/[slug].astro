@@ -2,11 +2,33 @@
 import PostPage from '../../../components/pages/PostPage.astro';
 import FourOhFour from '../../404.astro';
 import { getPostWithVersions } from '../../../lib/posts.js';
+import { verifyUnlockCookie } from '../../../lib/unlock.js';
 
 // SSR：每请求现查 Supabase，新文章发布后即刻可访问，无需重新构建
 const { slug } = Astro.params;
-// getPostWithVersions：按语言级联解析正文版本（目标→英文→中文），并带回各语言可用性
 const versions = (await getPostWithVersions(slug, 'en')) || null;
 if (!versions) Astro.response.status = 404;
+
+// 加密文章解锁判定：组级口径——versions.encrypted 为真时（该文任一行设了密码），
+// 校验 HMAC 签名 cookie（baseSlug 级，跨语言共享）。非加密文章默认放行（unlocked=true）。
+let unlocked = true;
+let passHint = '';
+if (versions && versions.encrypted) {
+  unlocked = await verifyUnlockCookie(Astro.cookies.get('unlocked')?.value, versions.base, (Astro.locals as any).runtime?.env);
+  passHint = versions.passHint || '';
+  Astro.response.headers.set('Cache-Control', 'private, no-store');
+}
+
+const safePost = versions
+  ? {
+      ...versions.post,
+      content: unlocked ? versions.post.content : '',
+      excerpt: unlocked ? versions.post.excerpt : '',
+    }
+  : null;
 ---
-{versions ? <PostPage lang="en" post={versions.post} versions={versions} /> : <FourOhFour lang="en" />}
+{versions && safePost ? (
+  <PostPage lang="en" post={safePost} versions={versions} unlocked={unlocked} passHint={passHint} />
+) : (
+  <FourOhFour lang="en" />
+)}

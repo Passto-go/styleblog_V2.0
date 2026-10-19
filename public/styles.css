@@ -775,6 +775,15 @@ a { color: inherit; }
 }
 .wb-badge.is-trash { color: #a04000; border-color: #f0d0b4; background: #fff3e6; }
 [data-theme="dark"] .wb-badge.is-trash { color: #e08a4a; border-color: #503418; background: #2a1c0e; }
+.wb-badge.is-enc { color: #9a6700; border-color: #f0dfb4; background: #fff8e6; }
+[data-theme="dark"] .wb-badge.is-enc { color: #e3b341; border-color: #5c4a1a; background: #2b230c; }
+
+/* 后台：文章访问加密编辑 */
+.wb-enc { border-top: 1px dashed var(--border); padding-top: 12px; }
+.wb-enc-toggle { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-strong); cursor: pointer; }
+.wb-enc-toggle input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.wb-enc-fields { display: grid; gap: 8px; margin-top: 10px; }
+.wb-enc-fields input { width: 100%; }
 .wb-item-title.is-trash { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .wb-trash-left { font-size: 11px; color: #b45309; font-weight: 600; }
 [data-theme="dark"] .wb-trash-left { color: #e08a4a; }

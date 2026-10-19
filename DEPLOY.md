@@ -44,6 +44,9 @@
    | `PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` 那串 anon public key | 是 |
    | `PUBLIC_SITE_URL` | `https://<项目名>.workers.dev` | 建议 |
    | `NODE_VERSION` | `22` | 建议（仓库已有 `.nvmrc`，双保险） |
+   | `UNLOCK_SECRET` | `openssl rand -hex 32` 生成的值 | 用文章加密才需（也可配成运行时 Secret，见下） |
+
+   > `UNLOCK_SECRET` 有两种配法，代码双路兼容（运行时优先）：**① Secret（推荐）**：Settings → Variables and Secrets → Add（Type: Secret），改密钥免重建；**② 构建变量**：加进上表，值随构建内联进 Worker。
 
 5. **Save and Deploy**，约 1–3 分钟得到 `https://<项目名>.workers.dev`
 6. 以后**只有改代码才需要 push**；发文不触发任何构建
@@ -110,6 +113,7 @@ directory = "./dist"
 - [ ] `/admin` 能登录、粘贴图片上传正常；发布提示为「已即时生效」
 - [ ] 文章页评论能加载、能发
 - [ ] 深色模式、手机宽度正常；设计与此前静态版一致
+- [ ] （如用文章加密）后台给测试文章设密码 → 列表/归档/RSS/sitemap/`search-index.json` 均不出现该文；文章页只见密码框，源码无正文；输对密码后正文呈现
 
 ## 六、免费额度说明（哪些操作消耗、哪些不消耗）
 
@@ -141,4 +145,6 @@ directory = "./dist"
 | Supabase 临时故障 | 拉取失败会回退示例文章（保留的降级逻辑） | 站点不崩，恢复后自动正常 |
 | sitemap / RSS / canonical 里是错域名 | `PUBLIC_SITE_URL` 没改；或（自建分支）`astro.config.mjs` 在 config 加载期读不到 `.env` | 改 Settings → Builds 的构建变量后 Retry deployment；本仓库已改用 Vite `loadEnv` 显式读取 `.env`（Astro 不会把 `.env` 注入该阶段的 `process.env`） |
 | Worker CPU 超限（免费 10ms/调用） | 超长文 marked 渲染耗时 | 当前文章量级远未触顶；真触顶再加边缘缓存 |
+| 加密文章输对密码却刷新后回到密码框 | `UNLOCK_SECRET` 被设为「构建变量」后中途改动，新旧 Worker 实例签名不一致；或浏览器未发送 cookie | 改用 Secret 类型配置（运行时统一读取）；确认协议为 https（本地 http 下 secure cookie 不生效属预期） |
+| 后台保存加密文章报「请填写访问密码」 | 勾了启用加密但密码框为空，且该文章此前没设过密码 | 填一个 ≥4 位密码再保存；仅想改提示可留空密码（沿用原密码） |
 | 想给动态页加缓存 | 默认无缓存，发布零延迟 | 需要时在响应加 `s-maxage=60`；个人博客当前没必要 |

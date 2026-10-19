@@ -76,6 +76,14 @@ export const ui = {
     'post.navLabel': '上一篇 / 下一篇',
     'post.attachments': '附件',
 
+    // 加密文章解锁
+    'post.locked': '此文章已加密',
+    'post.enterPassword': '请输入访问密码以阅读全文',
+    'post.passwordPlaceholder': '访问密码',
+    'post.unlock': '解锁',
+    'post.unlockWrong': '密码错误，请重试',
+    'post.unlockNetErr': '网络错误，请稍后重试',
+
     'share.title': '分享这篇文章',
     'share.copy': '复制链接',
     'share.copied': '已复制',
@@ -201,6 +209,14 @@ export const ui = {
     'post.next': 'Next →',
     'post.navLabel': 'Previous / Next post',
     'post.attachments': 'Attachments',
+
+    // Encrypted post unlock
+    'post.locked': 'This post is encrypted',
+    'post.enterPassword': 'Enter the access password to read the full post',
+    'post.passwordPlaceholder': 'Access password',
+    'post.unlock': 'Unlock',
+    'post.unlockWrong': 'Wrong password, please try again',
+    'post.unlockNetErr': 'Network error, please try again later',
 
     'share.title': 'Share this post',
     'share.copy': 'Copy link',

@@ -115,7 +115,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </div>
 
               <details class="wb-more">
-                <summary>更多设置（发布时间 / Slug / 摘要 / 封面）</summary>
+                <summary>更多设置（发布时间 / Slug / 摘要 / 封面 / 访问加密）</summary>
                 <div class="wb-more-body">
                   <label>发布时间<input id="f-published-at" type="datetime-local" /><small id="published-at-hint" class="wb-hint">修改已发布文章的展示与排序时间；留空则保持原时间</small></label>
                   <label>Slug<input id="f-slug" placeholder="留空自动生成" /><small id="slug-hint" class="wb-hint"></small></label>
@@ -128,6 +128,15 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                     <small id="excerpt-hint" class="wb-hint">用于列表卡片、文章首段、搜索、RSS 与分享卡片。留空发布时自动按正文截取；点右侧按钮可用 AI 生成</small>
                   </div>
                   <label>封面 URL<input id="f-cover" placeholder="https://…" /></label>
+                  <div class="wb-more-field wb-enc">
+                    <label class="wb-enc-toggle" for="f-encrypted"><input type="checkbox" id="f-encrypted" /> 启用访问加密</label>
+                    <small class="wb-hint">开启后前台文章页先显示密码框，密码正确才展示正文；文章不进列表/归档/搜索/sitemap，搜索引擎不收录。多语言版本共享同一密码（按文章基准 slug）。</small>
+                    <div id="enc-fields" class="wb-enc-fields" hidden>
+                      <input id="f-enc-pw" type="password" placeholder="设置访问密码（留空 = 不修改原密码）" autocomplete="new-password" />
+                      <input id="f-enc-hint" type="text" placeholder="密码提示语（可选，如：生日八位）" maxlength="60" />
+                      <small class="wb-hint">密码在数据库端哈希保存，后台与前台均不可见；取消勾选并保存即解除加密。</small>
+                    </div>
+                  </div>
                 </div>
               </details>
 
@@ -338,7 +347,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   let supabase = null;
 
   // 当前编辑态
-  const state = { id: '', slug: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false };
+  const state = { id: '', slug: '', lang: 'zh', status: 'draft', filter: 'all', query: '', saving: false, catSlug: '', catName: '', dirty: false, wasEncrypted: false, passHint: '' };
 
   // 本会话上传、但上传时文章尚无 slug 的附件 path：保存成功后按最终 slug 补关联 post_slug
   const pendingAttach = new Set();
@@ -1838,6 +1847,14 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('published-at-hint').textContent = '修改已发布文章的展示与排序时间；留空则保持原时间';
     $('f-author').value = (p.author || site.author || '').trim();
     $('f-content').value = p.content || '';
+    // 访问加密回显：开关与提示语可回显；密码永不回显（DB 端哈希，取了也看不出原文），
+    // 留空即「不修改原密码」。wasEncrypted/passHint 记录保存前的状态，供 persist 判增量。
+    $('f-encrypted').checked = !!p.is_encrypted;
+    $('f-enc-pw').value = '';
+    $('f-enc-hint').value = p.pass_hint || '';
+    state.wasEncrypted = !!p.is_encrypted;
+    state.passHint = p.pass_hint || '';
+    toggleEncFields();
     state.lang = p.lang || 'zh';
     state.status = p.published === false ? 'draft' : (p.id ? 'published' : 'draft');
     syncSeg($('f-lang'), state.lang);
@@ -1858,6 +1875,12 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   function syncSeg(container, value) {
     container.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === value));
   }
+
+  // 加密开关 ↔ 密码/提示输入框显隐
+  function toggleEncFields() {
+    $('enc-fields').hidden = !$('f-encrypted').checked;
+  }
+  $('f-encrypted').addEventListener('change', toggleEncFields);
 
   // ISO 时间 → datetime-local 输入值（本地时区 "YYYY-MM-DDTHH:mm"）
   function toLocalInput(iso) {
@@ -2140,8 +2163,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         const { lang: _omitLang, ...patch } = row;
         ({ error } = await supabase.from('posts').update(patch).eq('id', state.id));
       } else {
-        // 新建：作者预设了发布时间则用之，否则取当前时间
-        const r = await supabase.from('posts').insert({ ...row, published_at: row.published_at || new Date().toISOString() });
+        // 新建：作者预设了发布时间则用之，否则取当前时间。
+        // is_encrypted 继承：从已加密的文章切到新语言版（新建态）时，新行随整组
+        // 一同上锁（组级口径：同一把锁）。未加密文章传 undefined，键被 JSON 丢弃，
+        // 不碰该列——数据库尚未执行 encryption.sql 时也不会报错。
+        const r = await supabase.from('posts').insert({ ...row, is_encrypted: state.wasEncrypted || undefined, published_at: row.published_at || new Date().toISOString() });
         error = r.error;
         if (!error && r.data?.[0]) state.id = r.data[0].id;
       }
@@ -2165,6 +2191,39 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         }
         state.slug = row.slug;
         refreshAttachList();
+      }
+      // 访问加密：经 SECURITY DEFINER RPC 走（密码 DB 端 bcrypt 哈希，绝不进普通 update）。
+      // 三种路径：开加密+填新密码 → post_set_password（同时写提示语）；
+      //           开加密+未填密码+原本已加密 → 仅更新提示语（普通 update，authenticated 有权限）；
+      //           取消勾选+原本已加密 → post_clear_encryption。
+      // 新建分支里 state.id 已在 insert 后回填，此处两种场景都拿得到 id。
+      if (!error) {
+        const encOn = $('f-encrypted').checked;
+        const encPw = $('f-enc-pw').value;
+        const encHint = $('f-enc-hint').value.trim();
+        try {
+          if (encOn && encPw) {
+            if (encPw.length < 4) { setMsg('访问密码至少 4 位', 'err'); return null; }
+            const { error: e2 } = await supabase.rpc('post_set_password', { p_id: state.id, p_pw: encPw, p_hint: encHint });
+            if (e2) throw e2;
+          } else if (encOn && state.wasEncrypted) {
+            if (encHint !== (state.passHint || '')) {
+              const { error: e3 } = await supabase.from('posts').update({ pass_hint: encHint }).eq('id', state.id);
+              if (e3) throw e3;
+            }
+          } else if (encOn) {
+            setMsg('请设置访问密码（至少 4 位）', 'err');
+            return null;
+          } else if (state.wasEncrypted) {
+            const { error: e4 } = await supabase.rpc('post_clear_encryption', { p_id: state.id });
+            if (e4) throw e4;
+          }
+        } catch (e2) {
+          setMsg('加密设置保存失败：' + (e2.message || e2), 'err');
+          return null;
+        }
+        state.wasEncrypted = encOn;
+        state.passHint = encHint;
       }
       // 新建分类：同步写入注册表（best-effort，categories 表未建也不影响文章发布）
       if (!error && $('f-category').value === '__new__' && row.category) {
@@ -2308,6 +2367,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         : `<a class="wb-item-title" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="在新标签打开前台文章页">${escapeHtml(rep.title || '(无标题)')}</a>
          <span class="wb-item-meta">
            <span class="wb-badge ${rep.published ? 'is-live' : 'is-draft'}">${rep.published ? '已发布' : '草稿'}</span>
+           ${rep.is_encrypted ? '<span class="wb-badge is-enc" title="访问加密：前台需输入密码解锁；不进列表/搜索/sitemap">🔒 加密</span>' : ''}
            <span class="wb-date">${d}</span>
            <span class="wb-item-langs">${langTags}</span>
            <span class="wb-author">${escapeHtml(rep.author || site.author || '')}</span>
@@ -2428,7 +2488,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       .from('posts').select('*').order('published_at', { ascending: false });
     let { data, error } = await query;
     if (error) { $('post-list').innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
-    allPosts = data || [];
+    // pass_hash 不进入后台前端（bcrypt 不可逆，管理员也无需看到；与读者侧同一口径）
+    allPosts = (data || []).map(({ pass_hash, ...rest }) => rest);
     loadCategoryOptions();
     renderList();
     updateLangState();

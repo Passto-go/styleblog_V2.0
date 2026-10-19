@@ -11,6 +11,7 @@ const {
   langHrefs = null,
   image = '',
   type = 'website',
+  robots = 'index, follow',
 } = Astro.props;
 
 const t = useTranslations(lang);
@@ -56,6 +57,7 @@ const ogImage = image
     </script>
     <title>{pageTitle}</title>
     <meta name="description" content={desc} />
+    <meta name="robots" content={robots} />
     <link rel="canonical" href={canonical} />
 
     <link rel="alternate" hreflang="zh-CN" href={zhHref} />

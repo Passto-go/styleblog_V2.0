@@ -11,7 +11,7 @@ import Countdown from '../Countdown.astro';
 import Comments from '../Comments.astro';
 import Share from '../Share.astro';
 
-const { lang, post, versions } = Astro.props;
+const { lang, post, versions, unlocked = false, passHint = '' } = Astro.props;
 const t = useTranslations(lang);
 const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
@@ -34,8 +34,9 @@ const pagePath = localizePath(`/posts/${post.slug}/`, lang);
 // 基准 slug（去掉语言后缀，兼容历史 -ja）：用于给正文容器打「文章身份」标记，
 // 使仅针对某一篇文章的样式规则在它的所有语言版本上一致生效。
 const postBaseSlug = baseSlug(post.slug);
-// 文章附件：统一展示在正文底部「附件」区，仅文件名 + 下载链接，不进正文、无预览/大小
-const attachments = await getAttachments(postBaseSlug);
+// 文章附件：统一展示在正文底部「附件」区，仅文件名 + 下载链接，不进正文、无预览/大小。
+// 加密且未解锁时不查询/不渲染附件（避免附件直链提前暴露给未授权访问者）
+const attachments = unlocked ? await getAttachments(postBaseSlug) : [];
 // 分享需要绝对地址（社交平台不接受相对路径）
 const shareUrl = Astro.site ? new URL(pagePath, Astro.site).href : pagePath;
 const prevPost = idx > 0 ? allPosts[idx - 1] : null;
@@ -67,8 +68,36 @@ const missingNotice = (() => {
   };
 })();
 ---
+<style is:global>
+  /* 加密文章未解锁时的密码框（与既有附件区/卡片风格一致） */
+  .post-lock {
+    max-width: 460px;
+    margin: 2.5em auto;
+    padding: 1.6em 1.4em;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    text-align: center;
+  }
+  .post-lock-title { margin: 0 0 0.6em; font-weight: 600; }
+  .post-lock-hint { margin: 0 0 1em; color: var(--muted); font-size: 0.92em; }
+  .post-lock-form { display: flex; gap: 0.6em; justify-content: center; flex-wrap: wrap; }
+  .post-lock-input {
+    flex: 1 1 200px; min-width: 0; padding: 0.55em 0.7em;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+  }
+  .post-lock-btn {
+    padding: 0.55em 1.1em; border: 0; border-radius: 8px;
+    background: var(--primary); color: #fff; cursor: pointer;
+  }
+  .post-lock-btn:hover { opacity: 0.9; }
+  .post-lock-msg { margin: 0.8em 0 0; min-height: 1.2em; font-size: 0.9em; color: var(--muted); }
+  .post-lock-msg-err { color: #c0392b; }
+</style>
+
 {/* image：封面仅用于分享缩略图（og:image / twitter:image），正文页不渲染封面大图 */}
-<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs} image={post.cover || ''} type="article">
+<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs} image={post.cover || ''} type="article" robots={post.is_encrypted ? 'noindex, nofollow' : undefined}>
   <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
   <div class="post-head">
     <div class="post-head-inner">
@@ -102,9 +131,27 @@ const missingNotice = (() => {
           )}
         </aside>
       )}
-      {post.excerpt && <p class="post-lead">{post.excerpt}</p>}
-      {/* data-post：暴露文章基准 slug，供「仅对指定文章生效」的样式/脚本作用域钩子使用 */}
-      <div class="content" data-post={postBaseSlug} set:html={html} />
+      {unlocked && post.excerpt && <p class="post-lead">{post.excerpt}</p>}
+      {/* 加密文章未解锁：不渲染正文，仅展示密码框（正文/附件/评论均不进 DOM） */}
+      {unlocked ? (
+        <div class="content" data-post={postBaseSlug} set:html={html} />
+      ) : (
+        <section class="post-lock" aria-label={t('post.locked')}>
+          <p class="post-lock-title">{t('post.enterPassword')}</p>
+          {passHint && <p class="post-lock-hint">{passHint}</p>}
+          <form id="unlock-form" class="post-lock-form">
+            <input
+              type="password"
+              id="unlock-pw"
+              class="post-lock-input"
+              placeholder={t('post.passwordPlaceholder')}
+              autocomplete="current-password"
+            />
+            <button type="submit" class="post-lock-btn">{t('post.unlock')}</button>
+          </form>
+          <p id="unlock-msg" class="post-lock-msg" role="alert"></p>
+        </section>
+      )}
       {attachments.length > 0 && (
         <section class="post-attachments" aria-label={t('post.attachments')}>
           <h2 class="post-attachments-title">{t('post.attachments')}</h2>
@@ -117,8 +164,8 @@ const missingNotice = (() => {
           </ul>
         </section>
       )}
-      <Share lang={lang} url={shareUrl} title={post.title} />
-      <Comments lang={lang} page={pagePath} />
+      {unlocked && <Share lang={lang} url={shareUrl} title={post.title} />}
+      {unlocked && <Comments lang={lang} page={pagePath} />}
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
     </article>
   </div>
@@ -141,7 +188,7 @@ const missingNotice = (() => {
   )}
 </Base>
 
-<script>
+<script define:vars={{ postBaseSlug, unlockWrong: t('post.unlockWrong'), unlockNetErr: t('post.unlockNetErr') }}>
   (function () {
     var fill = document.getElementById('reading-fill');
     if (!fill) return;
@@ -178,5 +225,32 @@ const missingNotice = (() => {
         wrap.appendChild(t);
       }
     }
+  })();
+
+  // 加密文章解锁：提交密码到 /api/unlock，成功后整页刷新（SSR 重新渲染正文）
+  (function () {
+    var form = document.getElementById('unlock-form');
+    if (!form) return;
+    var input = document.getElementById('unlock-pw');
+    var msg = document.getElementById('unlock-msg');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pw = (input.value || '').trim();
+      if (!pw) return;
+      msg.textContent = '';
+      msg.className = 'post-lock-msg';
+      fetch('/api/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: postBaseSlug, password: pw }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) { location.reload(); return; }
+          msg.textContent = d.error || unlockWrong;
+          msg.classList.add('post-lock-msg-err');
+        })
+        .catch(function () { msg.textContent = unlockNetErr; msg.classList.add('post-lock-msg-err'); });
+    });
   })();
 </script>
