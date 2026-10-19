@@ -19,7 +19,7 @@ const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlu
 
 // 上下篇导航：相邻关系按「当前语言视图」的文章顺序取（每篇只含该语言最匹配的版本），
 // 避免跳到另一语言的同名文章；标题则用该文章在目标语言下的译文（无译文才保留原文），
-// 否则英文/日文页会直接露出中文标题。
+// 否则英文页会直接露出中文标题。
 const allPosts = await getAllPosts(lang);
 const displayTitle = titleResolver(await getAllPostsEveryLang(), lang);
 // 分类名以注册表为准：按 post.category_slug 反查当前语言名称，缺行才回退中文快照
@@ -31,7 +31,7 @@ const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const readMinutes = readingMinutes(post.content);
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
 const pagePath = localizePath(`/posts/${post.slug}/`, lang);
-// 基准 slug（去掉 -en/-ja 语言后缀）：用于给正文容器打「文章身份」标记，
+// 基准 slug（去掉语言后缀，兼容历史 -ja）：用于给正文容器打「文章身份」标记，
 // 使仅针对某一篇文章的样式规则在它的所有语言版本上一致生效。
 const postBaseSlug = baseSlug(post.slug);
 // 文章附件：统一展示在正文底部「附件」区，仅文件名 + 下载链接，不进正文、无预览/大小
@@ -53,27 +53,16 @@ for (const code of Object.keys(languages)) {
 }
 
 // 无译文提示横幅：当前语言缺「已发布译文」时告知读者现状。
-// 判定条件与优先级（与 lib/posts.js 的 pickDisplayLang 级联保持一致）：
-//   · en 页：无英文译文 → 提示；有日文译文时附日文版链接（正文此时为中文兜底）
-//   · ja 页：无日文译文 → 提示；正文此时为英文兜底（有英文译文）或中文兜底
-//   · zh 页：不展示——中文即原文，且中文页不存在「缺中文译文」的业务场景
+// 判定条件（与 lib/posts.js 的 pickDisplayLang 级联保持一致）：
+//   · en 页：无英文译文 → 提示（正文此时为中文兜底）
+//   · zh 页：不展示——中文即原文，不存在「缺中文译文」的业务场景
 // 适用边界：versions.available 只认 published=true 的版本，草稿译文对读者视为不存在。
 const missingNotice = (() => {
-  if (!versions || lang === 'zh') return null;
-  if (lang === 'en') {
-    if (versions.available.en) return null;
-    return {
-      text: versions.available.ja ? t('article.missingEn') : t('article.missingEnJa'),
-      note: t('article.showingZh'),
-      link: versions.siblings.ja
-        ? { href: localizePath(`/posts/${versions.siblings.ja}/`, 'ja'), label: t('article.readJa') }
-        : null,
-    };
-  }
-  if (versions.available.ja) return null;
+  if (!versions || lang !== 'en') return null;
+  if (versions.available.en) return null;
   return {
-    text: versions.available.en ? t('article.missingJa') : t('article.missingJaEn'),
-    note: versions.displayLang === 'en' ? t('article.showingEn') : t('article.showingZh'),
+    text: t('article.missingEn'),
+    note: t('article.showingZh'),
     link: null,
   };
 })();

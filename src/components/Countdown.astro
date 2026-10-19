@@ -13,27 +13,39 @@ const cfg = setting && setting.target ? setting : site.countdown;
 const name = cfg.name || cfg.label || '';
 const target = cfg.target;
 
-const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : lang === 'ja' ? ['日', '時', '分', '秒'] : ['天', '时', '分', '秒'];
+// 倒计时统一按北京时间（UTC+8）锚定，避免「同一设置、不同结果」：
+//   1) 存量朴素 ISO（无时区后缀）按 +08:00 解释，而非访客本地时区；
+//   2) 已带 Z / ±HH:MM 后缀的值尊重原样，不重复拼接。
+function normalizeTz(iso) {
+  const s = String(iso || '').trim();
+  if (!s) return s;
+  if (/[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s)) return s;
+  return s + '+08:00';
+}
+const tzTarget = normalizeTz(target);
+
+const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : ['天', '时', '分', '秒'];
 const units = ['d', 'h', 'm', 's'];
 
 function fmtDate(iso, l) {
-  const d = new Date(iso);
+  const d = new Date(normalizeTz(iso));
   if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
+  // 服务端运行时 TZ 为 UTC，必须显式锁定 Asia/Shanghai 取日期分量
+  const opts = { timeZone: 'Asia/Shanghai', year: 'numeric', day: 'numeric' };
   if (l === 'en') {
-    const mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
-    return `${mo} ${day}, ${y}`;
+    return d.toLocaleDateString('en-US', { ...opts, month: 'short' });
   }
-  return `${y}年${m}月${day}日`;
+  return d.toLocaleDateString('zh-CN', { ...opts, month: 'long' });
 }
 const dateStr = fmtDate(target, lang);
 const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
 ---
 <section class="widget">
   <h4 class="widget-title"><Icon name="clock" size={15} /> {t('widget.countdown')}</h4>
-  <p class="countdown-label">{t('widget.countdownTo', { label: fullLabel })}</p>
+  <p class="countdown-label">
+    {t('widget.countdownTo', { label: fullLabel })}
+    <span class="countdown-tz">{t('widget.countdownTz')}</span>
+  </p>
   <div class="countdown-grid" id="countdown">
     {units.map((u, i) => (
       <div class="cd-cell">
@@ -44,10 +56,11 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
   </div>
 </section>
 
-<script define:vars={{ target }}>
+<script define:vars={{ target: tzTarget }}>
   (function () {
     var el = document.getElementById('countdown');
     if (!el) return;
+    // target 已在服务端归一化为带 +08:00 的 ISO，本地解析即北京时间终点
     var end = new Date(target).getTime();
     function p2(n) { return String(n).padStart(2, '0'); }
     function tick() {

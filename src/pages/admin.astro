@@ -67,7 +67,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                 <div class="wb-seg" id="f-lang" role="group" aria-label="语言">
                   <button type="button" data-v="zh" class="on">中文</button>
                   <button type="button" data-v="en">EN</button>
-                  <button type="button" data-v="ja">日本語</button>
                 </div>
                 <select id="f-category" class="wb-cat" aria-label="分类"></select>
                 <div id="new-cat-box" class="wb-cat-new" hidden>
@@ -111,7 +110,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               <div class="wb-trbar">
                 <span class="wb-trbar-label">一键翻译</span>
                 <button id="tr-en-btn" class="wb-tr-btn" type="button" title="把当前文章译成英文并填入编辑器，检查后发布即创建/更新英文版">译成英文</button>
-                <button id="tr-ja-btn" class="wb-tr-btn" type="button" title="把当前文章译成日文并填入编辑器，检查后发布即创建/更新日文版">译成日文</button>
                 <span id="lang-state" class="wb-langstate"></span>
                 <span id="tr-msg" class="wb-hint"></span>
               </div>
@@ -308,10 +306,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               <div id="cat-add-box" class="wb-cat-new wb-cat-new--manage" hidden>
                 <input id="cat-add-name" class="wb-cat" placeholder="中文名（必填），如：技术随笔" />
                 <input id="cat-add-name-en" class="wb-cat" placeholder="English name（可选，如 Tech Notes）" />
-                <input id="cat-add-name-ja" class="wb-cat" placeholder="日本語名（可选，如 技術メモ）" />
                 <input id="cat-add-slug" class="wb-cat" placeholder="slug（留空自动生成，仅小写字母/数字/连字符）" />
                 <span id="cat-add-preview" class="wb-cat-slug-preview"></span>
-                <span class="wb-hint wb-cat-new-hint">中文名必填；EN / 日本語 留空则该语言前台回退显示中文名。Slug＝网址里的后缀，三语共用同一个。</span>
+                <span class="wb-hint wb-cat-new-hint">中文名必填；EN 留空则英文前台回退显示中文名。Slug＝网址里的后缀，中英共用同一个。</span>
                 <button id="cat-add-save" class="wb-cat-act" type="button">保存</button>
                 <button id="cat-add-cancel" class="wb-cat-act wb-cat-cancel" type="button">取消</button>
                 <span id="cat-add-msg" class="wb-cat-rename-msg"></span>
@@ -346,7 +343,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   // 本会话上传、但上传时文章尚无 slug 的附件 path：保存成功后按最终 slug 补关联 post_slug
   const pendingAttach = new Set();
 
-  const LANGS = { zh: '中文', en: 'EN', ja: '日本語' };
+  const LANGS = { zh: '中文', en: 'EN' };
 
   // 一键翻译提示行当前对应的版本 { id, lang }：切版本后用它判断旧提示是否已过期
   let trMsgFor = { id: '', lang: '' };
@@ -429,7 +426,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const msg = $('cd-msg');
     if (!name || !date) { msg.textContent = '请填写名称和日期'; msg.dataset.kind = 'err'; return; }
     msg.textContent = '保存中…'; msg.dataset.kind = '';
-    const target = date + 'T00:00:00';
+    // 固定锚定北京时间（UTC+8）：date 来自 <input type="date">，值为 YYYY-MM-DD
+    const target = date + 'T00:00:00+08:00';
     const { error } = await supabase
       .from('site_settings')
       .upsert({ key: 'countdown', value: { name, target }, updated_at: new Date().toISOString() });
@@ -1317,19 +1315,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         const name = (p.category || '').trim();
         const slug = (p.category_slug || '').trim() || slugify(name) || 'uncategorized';
         if (!name && slug === 'uncategorized') return;
-        if (!map.has(slug)) map.set(slug, { name: name || slug, name_en: '', name_ja: '', slug, count: 0 });
+        if (!map.has(slug)) map.set(slug, { name: name || slug, name_en: '', slug, count: 0 });
         map.get(slug).count++;
       });
-      // 注册表（含 0 篇的新增分类），名称以注册表为准（含三语）
+      // 注册表（含 0 篇的新增分类），名称以注册表为准（含中英）
       try {
-        const { data: reg } = await supabase.from('categories').select('name, name_en, name_ja, slug');
+        const { data: reg } = await supabase.from('categories').select('name, name_en, slug');
         (reg || []).forEach((r) => {
           if (!r.slug) return;
-          if (!map.has(r.slug)) map.set(r.slug, { name: r.name || r.slug, name_en: '', name_ja: '', slug: r.slug, count: 0 });
+          if (!map.has(r.slug)) map.set(r.slug, { name: r.name || r.slug, name_en: '', slug: r.slug, count: 0 });
           const row = map.get(r.slug);
           row.name = r.name || row.name;
           row.name_en = r.name_en || '';
-          row.name_ja = r.name_ja || '';
         });
       } catch {}
       rows = [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
@@ -1358,8 +1355,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     nameBtn.innerHTML =
       '<span class="wb-cat-toggle-icon">▸</span>' + escapeHtml(c.name) +
       (c.name_en ? `<span class="wb-cat-alt">${escapeHtml(c.name_en)}</span>` : '') +
-      (c.name_ja ? `<span class="wb-cat-alt">${escapeHtml(c.name_ja)}</span>` : '') +
-      (!c.name_en || !c.name_ja ? '<span class="wb-cat-alt wb-cat-alt--missing">缺译文</span>' : '');
+      (!c.name_en ? '<span class="wb-cat-alt wb-cat-alt--missing">缺译文</span>' : '');
     main.appendChild(nameBtn);
 
     const slugEl = document.createElement('span');
@@ -1542,11 +1538,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     nameEnInput.value = c.name_en || '';
     nameEnInput.placeholder = 'English name（可选）';
 
-    const nameJaInput = document.createElement('input');
-    nameJaInput.className = 'wb-cat-input';
-    nameJaInput.value = c.name_ja || '';
-    nameJaInput.placeholder = '日本語名（可选）';
-
     const slugInput = document.createElement('input');
     slugInput.className = 'wb-cat-input';
     slugInput.value = c.slug;
@@ -1577,7 +1568,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       if (!/^[a-z0-9-]+$/.test(newSlug)) { msg.textContent = 'Slug 只能是小写字母、数字和连字符'; return; }
       if (newSlug !== c.slug && all.some((o) => o.slug === newSlug)) { msg.textContent = '该 Slug 已存在'; return; }
       save.textContent = '保存中…'; save.disabled = true;
-      const ok = await renameCategory(c, newName, newSlug, nameEnInput.value.trim(), nameJaInput.value.trim());
+      const ok = await renameCategory(c, newName, newSlug, nameEnInput.value.trim());
       if (ok) await loadCatManage();
       else { save.textContent = '保存'; save.disabled = false; }
     };
@@ -1590,7 +1581,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
     const row1 = document.createElement('div');
     row1.className = 'wb-cat-rename-row';
-    row1.append(nameInput, nameEnInput, nameJaInput, slugInput, preview);
+    row1.append(nameInput, nameEnInput, slugInput, preview);
     const row2 = document.createElement('div');
     row2.className = 'wb-cat-rename-row';
     row2.append(save, cancel, msg);
@@ -1598,20 +1589,20 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     nameInput.focus();
   }
 
-  async function renameCategory(src, newName, newSlug, nameEn = '', nameJa = '') {
+  async function renameCategory(src, newName, newSlug, nameEn = '') {
     // 1) 改写该分类下所有文章的显示名与 slug
-    //    注意：posts.category 只是中文名快照，英/日名称以 categories 表为准，这里不动。
+    //    注意：posts.category 只是中文名快照，英文名称以 categories 表为准，这里不动。
     const { error } = await supabase
       .from('posts').update({ category: newName, category_slug: newSlug })
       .eq('category_slug', src.slug);
     if (error) { alert('重命名失败：' + error.message); return false; }
-    // 同步注册表（best-effort）。name_en / name_ja 若列为空字符串，写入空串（前台会回退中文）。
+    // 同步注册表（best-effort）。name_en 若为空字符串，写入空串（前台会回退中文）。
     try {
-      const patch = { name: newName, slug: newSlug, name_en: nameEn || null, name_ja: nameJa || null };
+      const patch = { name: newName, slug: newSlug, name_en: nameEn || null };
       let { error: regErr } = await supabase
         .from('categories').update(patch).eq('slug', src.slug);
-      // 数据库尚未执行迁移（无 name_en/name_ja 列）时，回退为只改 name/slug，避免整体失败
-      if (regErr && /name_en|name_ja|column/i.test(regErr.message || '')) {
+      // 数据库尚未执行迁移（无 name_en 列）时，回退为只改 name/slug，避免整体失败
+      if (regErr && /name_en|column/i.test(regErr.message || '')) {
         await supabase.from('categories').update({ name: newName, slug: newSlug }).eq('slug', src.slug);
       }
     } catch {}
@@ -1636,14 +1627,13 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       .eq('category_slug', src.slug);
     if (error) { alert('合并失败：' + error.message); return false; }
     // 同步注册表（best-effort）：确保目标存在，删除源
-    // 目标若缺译文，用源分类的译文补上，避免合并后英文/日文名丢失
+    // 目标若缺译文，用源分类的英文名补上，避免合并后英文名丢失
     try {
       await supabase.from('categories').upsert(
         {
           name: dst.name,
           slug: dst.slug,
           name_en: dst.name_en || src.name_en || null,
-          name_ja: dst.name_ja || src.name_ja || null,
         },
         { onConflict: 'slug' }
       );
@@ -1663,7 +1653,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // ---------- 一键翻译（经 /api/translate 服务端中转调 LLM） ----------
-  // 约定：中文原文用 base slug，英/日译文用 base-en / base-ja 后缀（posts.slug 全局唯一）。
+  // 约定：中文原文用 base slug，英文译文用 base-en 后缀（posts.slug 全局唯一；保留 -ja 以兼容历史日文）。
   function baseSlug(slug) {
     return String(slug || '').replace(/-(en|ja)$/, '');
   }
@@ -1679,7 +1669,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   // 按「编辑器当前正在编辑的版本」重新生成 tr-msg 提示。
   // 存在的意义：点语言按钮 / 点译文状态按钮 / 载入历史版本都会换编辑对象，
-  // 旧提示留着的语言与 URL 就都是错的（典型现象：点了 EN，提示仍说「已切换到日本語版」）。
+  // 旧提示留着的语言与 URL 就都是错的（典型现象：切换了版本，提示却还停留在上一个语言）。
   // 因此凡是改变当前编辑版本的操作，末尾都要调它做一次对齐。
   function renderTrMsg() {
     const row = state.id ? allPosts.find((p) => p.id === state.id) : null;
@@ -1696,7 +1686,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     }
   }
 
-  // 译文状态行：显示当前文章的英/日版本是否已存在（按 base slug 匹配内存全量表），
+  // 译文状态行：显示当前文章的英文版是否已存在（按 base slug 匹配内存全量表），
   // 已存在的可点击直接载入该版本（与语言按钮同一套判定：langOf + findVersion）。
   function updateLangState() {
     const el = $('lang-state');
@@ -1706,7 +1696,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     if (!rawSlug) { el.innerHTML = ''; return; }
     const base = stripLangSuffix(rawSlug);
     const parts = [];
-    for (const code of ['en', 'ja']) {
+    for (const code of ['en']) {
       const row = findVersion(base, code, state.id);
       parts.push(
         row
@@ -1740,7 +1730,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const base = rawSlug ? stripLangSuffix(rawSlug) : '';
     box.querySelectorAll('button[data-v]').forEach((b) => {
       const code = b.dataset.v;
-      const label = LANGS[code] === 'EN' ? 'EN' : (LANGS[code] === '日本語' ? '日本語' : '中文');
+      const label = LANGS[code] === 'EN' ? 'EN' : '中文';
       let mark = '';
       if (base) {
         // 当前正在编辑的这一版，按编辑器里的状态算（未保存的改动也反映出来）
@@ -1768,7 +1758,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const existing = allPosts.find(
       (p) => p.id !== state.id && stripLangSuffix(p.slug) === base && langOf(p) === targetLang
     );
-    const langName = targetLang === 'en' ? '英文' : '日文';
+    const langName = '英文';
 
     if (!confirm(
       existing
@@ -1776,7 +1766,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         : `将把当前文章译成${langName}并填入编辑器（不会自动保存）。发布时会创建新的${langName}版文章。继续？`
     )) return;
 
-    const btns = [$('tr-en-btn'), $('tr-ja-btn')];
+    const btns = [$('tr-en-btn')];
     btns.forEach((b) => { b.disabled = true; b.style.opacity = '.55'; b.style.pointerEvents = 'none'; });
     setTrMsg(`正在翻译成${langName}，通常 1 分钟内完成；服务繁忙时最长 3 分 20 秒，超时可重试…`, '');
     // 超时护栏：覆盖服务端 503 退避重试（最长约 166 秒）+ 模型生成的全程，避免永久转圈
@@ -1914,7 +1904,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     };
   }
 
-  // 自动生成 Slug。按站点约定：中文用基础名，英/日文加 -en / -ja 后缀，
+  // 自动生成 Slug。按站点约定：中文用基础名，英文加 -en 后缀，
   // 这样同一篇文章的各语言版本不会因 slug 相同而撞唯一约束。
   function autoSlug(title, lang) {
     const base = slugify(title) || 'post-' + Date.now();
@@ -1923,10 +1913,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
   // 语言 → slug 后缀（中文无后缀）
   function langSuffix(lang) {
-    return lang === 'en' ? '-en' : lang === 'ja' ? '-ja' : '';
+    return lang === 'en' ? '-en' : '';
   }
 
-  // 剥掉尾部语言后缀。-en / -ja 反复切换时若只剥一次会叠成 xxx-en-ja，
+  // 剥掉尾部语言后缀。-en（及历史 -ja）反复切换时若只剥一次会叠成 xxx-en-ja，
   // 这里循环剥到稳定（与 baseSlug 的单次剥离分开，不影响译文/媒体的既有匹配口径）
   function stripLangSuffix(slug) {
     let s = String(slug || '');
@@ -1944,8 +1934,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     if (!input) return;
     const raw = input.value.trim();
     // 主体名优先级：传入主体 > 已填 slug 剥后缀 > 标题 slugify；三者皆空则主体为空串。
-    // 中文无后缀；英/日拼后缀——主体为空时即写出裸后缀（如 "-en"），
-    // 满足「新建文章切到英文即填 -en、切日文即填 -ja、中文保持空白」的诉求。
+    // 中文无后缀；英文拼后缀——主体为空时即写出裸后缀（如 "-en"），
+    // 满足「新建文章切到英文即填 -en、中文保持空白」的诉求。
     let base = baseOverride || stripLangSuffix(raw) || slugify($('f-title').value || '');
     const want = base + langSuffix(nextLang);
     if (input.value.trim() !== want) {
@@ -1961,6 +1951,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   // 判断一行属于哪种语言：优先信任 lang 字段；
   // 但历史数据存在 lang 未填/填错（如 error-and-debug-en 的 lang 仍是 zh），
   // 因此 lang 缺失或与 slug 后缀明显矛盾时，按 slug 后缀兜底推断，保证归组与切换不跑偏。
+  // 注：-ja 判定仅为兼容历史日文文章的兜底，前台已无日语，读者侧永不触达。
   function langOf(row) {
     if (!row) return 'zh';
     const declared = row.lang || '';
@@ -2019,8 +2010,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       state.dirty = false;
       // 提示统一由 renderTrMsg 按「刚载入的这一行」生成：语言、发布状态、URL 三者
       // 一次性对齐。历史上这里先写一条通用提示、命中已发布时再覆盖一条，
-      // 而其它入口（译文状态按钮、草稿恢复）切换后完全不刷新，才出现
-      // 「点了 EN、提示还说日本語版」的错位。
+      // 而其它入口（译文状态按钮、草稿恢复）切换后完全不刷新，才出现提示语错位。
       renderTrMsg();
     } else {
       // ② 尚无该语言版本 → 转新建态，slug 以原文 base 为准拼后缀（标题此刻仍是原文，不能按标题推导）
@@ -2032,7 +2022,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       $('delete-btn').hidden = true;
       syncSlugWithLang(nextLang, base);
       updateSlugStatusMarks();
-      const label = nextLang === 'en' ? '英文' : (nextLang === 'ja' ? '日文' : '中文');
+      const label = nextLang === 'en' ? '英文' : '中文';
       setTrMsg(
         isBlankNew
           ? `已切到${LANGS[nextLang]}，Slug 已带后缀；该文尚无${label}版，发布将新建`
@@ -2245,14 +2235,14 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const inTrash = state.filter === 'trash';
 
     // 按 base slug 分组：同一篇文章的各语言版本合并为一行展示。
-    // 分组键同时兼容两种多语言约定：「同 slug + lang 区分」与「slug 后缀 -en/-ja」。
+    // 分组键同时兼容两种多语言约定：「同 slug + lang 区分」与「slug 后缀 -en（兼容历史 -ja）」。
     const groupMap = new Map();
     for (const p of allPosts) {
       const key = baseSlug(p.slug);
       if (!groupMap.has(key)) groupMap.set(key, []);
       groupMap.get(key).push(p);
     }
-    const langOrder = { zh: 0, en: 1, ja: 2 };
+    const langOrder = { zh: 0, en: 1 };
     const allRows = [...groupMap.values()].map((posts) => {
       const sorted = [...posts].sort(
         (a, b) => (langOrder[langOf(a)] ?? 9) - (langOrder[langOf(b)] ?? 9)
@@ -2302,9 +2292,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       const langTags = versions
         .map((v) => {
           // 用 langOf 而非裸 v.lang：历史脏数据（如 error-and-debug-en 的 lang 仍是 zh）
-          // 会显示成三个「中文」，按 slug 后缀兜底才能正确标出 EN / 日本語。
+          // 会显示成多个「中文」，按 slug 后缀兜底才能正确标出 EN（兼容历史 ja）。
           const code = langOf(v);
-          return `<button type="button" class="wb-item-lang" data-id="${v.id}" title="编辑${LANGS[code]}版">${LANGS[code]}</button>`;
+          return `<button type="button" class="wb-item-lang" data-id="${v.id}" title="编辑${LANGS[code] || code}版">${LANGS[code] || code}</button>`;
         })
         .join('');
       main.innerHTML = inTrash
@@ -2506,7 +2496,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   async function addCategory() {
     const name = $('cat-add-name').value.trim();
     const nameEn = ($('cat-add-name-en')?.value || '').trim();
-    const nameJa = ($('cat-add-name-ja')?.value || '').trim();
     const msg = $('cat-add-msg');
     if (!name) { msg.textContent = '请填写中文名'; return; }
     let slug = $('cat-add-slug').value.trim() || slugify(name);
@@ -2514,11 +2503,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     if (catOpts.some((c) => c.slug === slug)) { msg.textContent = '该 Slug 已存在'; return; }
     const saveBtn = $('cat-add-save');
     saveBtn.disabled = true; saveBtn.textContent = '保存中…';
-    // 先带三语写入；若数据库尚无 name_en/name_ja 列则回退为只写 name/slug（部署顺序不受限）
+    // 先带中英写入；若数据库尚无 name_en 列则回退为只写 name/slug（部署顺序不受限）
     let { error } = await supabase.from('categories').insert({
-      name, slug, name_en: nameEn || null, name_ja: nameJa || null,
+      name, slug, name_en: nameEn || null,
     });
-    if (error && /name_en|name_ja|column/i.test(error.message || '')) {
+    if (error && /name_en|column/i.test(error.message || '')) {
       ({ error } = await supabase.from('categories').insert({ name, slug }));
     }
     saveBtn.disabled = false; saveBtn.textContent = '保存';
@@ -2526,7 +2515,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('cat-add-box').hidden = true;
     $('cat-add-name').value = ''; $('cat-add-slug').value = ''; $('cat-add-preview').textContent = '';
     if ($('cat-add-name-en')) $('cat-add-name-en').value = '';
-    if ($('cat-add-name-ja')) $('cat-add-name-ja').value = '';
     await loadCatManage();
     await loadCategoryOptions();
   }
@@ -2573,7 +2561,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   function restoreLocalDraft() {
     try {
       // 依次尝试各语言草稿键，恢复最近保存的那一份（旧版单键也兼容读取）
-      const keys = [draftKey('zh'), draftKey('en'), draftKey('ja'), DRAFT_KEY];
+      const keys = [draftKey('zh'), draftKey('en'), DRAFT_KEY];
       let snap = null, bestTs = 0;
       for (const k of keys) {
         const raw = localStorage.getItem(k);
@@ -2834,7 +2822,6 @@ Astro.response.headers.set('Cache-Control', 'no-store');
 
     // 一键翻译
     $('tr-en-btn').onclick = () => translateTo('en');
-    $('tr-ja-btn').onclick = () => translateTo('ja');
 
     // 文件管理：筛选 / 搜索 / 上传 / 清理 / 刷新
     $('fm-filter').querySelectorAll('button').forEach((b) => b.onclick = () => {
@@ -2939,7 +2926,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         saveLocalDraft();
       });
     });
-    // Slug 失焦时按当前语言规整一次后缀：英/日文补 -en / -ja，已有旧后缀则替换而非叠加。
+    // Slug 失焦时按当前语言规整一次后缀：英文补 -en，已有旧后缀（含历史 -ja）则替换而非叠加。
     // 放在 blur 而非 input 上，避免边打字边被改写；中文态不强制去后缀，只在提示里建议。
     $('f-slug').addEventListener('blur', () => {
       const suffix = langSuffix(state.lang);

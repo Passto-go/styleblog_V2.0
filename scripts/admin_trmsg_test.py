@@ -1,19 +1,18 @@
 """
 后台「一键翻译」提示行与当前编辑版本一致性 —— 端到端验证
 
-复现的问题：点「一键翻译」行右侧的 EN / 日本語 按钮切换版本后，
+复现的问题：点「一键翻译」行右侧的 EN 按钮切换版本后，
 tr-msg 绿色提示仍停留在上一个版本的语言与 URL，不随切换更新。
 
 验证点：
-  A. 从中文版点 EN → 提示文案与 URL 指向英文版（不再是中文/日文）
-  B. 再点 日本語 → 提示切换到日文版
-  C. 点回 中文 → 提示回到中文版
-  D. 点 lang-state 的「EN ✓」按钮（另一处换版入口）→ 提示同步
-  E. 未知语言版本（无该语言行）→ 提示为「新建态」口径，不残留旧 URL
-  F. 回归：翻译按钮填入译文后提示为「✓ 译文已填入」，不被误覆盖
+  A. 从中文版点 EN → 提示文案与 URL 指向英文版（不再是中文）
+  B. 再点回 中文 → 提示回到中文版
+  C. 点 lang-state 的「EN ✓」按钮（另一处换版入口）→ 提示同步
+  D. 未知语言版本（无该语言行）→ 提示为「新建态」口径，不残留旧 URL
+  E. 回归：翻译按钮填入译文后提示为「✓ 译文已填入」，不被误覆盖
 
-运行：python3 scripts/admin_trmsg_test.py（dev server 在 4400）
-说明：注入伪造 session + 拦截 Supabase REST，模拟一个「中/英/日三版都已发布」的文章。
+运行：python3 scripts/admin_trmsg_test.py（dev server 在 4401）
+说明：注入伪造 session + 拦截 Supabase REST，模拟一个「中/英两版都已发布」的文章。
 """
 import asyncio
 import json
@@ -42,9 +41,6 @@ ROWS = [
     {"id": "r-en", "title": "English Title", "slug": SLUG + "-en", "lang": "en", "content": "English body",
      "published": True, "published_at": "2026-10-02T00:00:00+00:00", "category": "Essays",
      "category_slug": "essays", "excerpt": "EN excerpt", "cover": "", "author": "老一贯"},
-    {"id": "r-ja", "title": "日本語タイトル", "slug": SLUG + "-ja", "lang": "ja", "content": "日本語の本文",
-     "published": True, "published_at": "2026-10-03T00:00:00+00:00", "category": "随筆",
-     "category_slug": "essays", "excerpt": "JA 概要", "cover": "", "author": "老一贯"},
 ]
 
 results = []
@@ -78,8 +74,8 @@ async def mock_routes(page):
                 return await route.fulfill(status=200, content_type="application/json", body="[]")
             if "/categories" in url:
                 return await route.fulfill(status=200, content_type="application/json",
-                                           body=json.dumps([{"slug": "essays", "name_zh": "随笔",
-                                                             "name_en": "Essays", "name_ja": "随筆"}]))
+                                           body=json.dumps([{"slug": "essays", "name": "随笔",
+                                                             "name_en": "Essays"}]))
             if "/site_settings" in url:
                 return await route.fulfill(status=200, content_type="application/json", body="[]")
             if "/media" in url:
@@ -140,7 +136,7 @@ async def main():
             await page.wait_for_timeout(400)
 
         async def click_lang(code):
-            """点「一键翻译」行右侧的 EN / 日本語 按钮（switchLangVersion 路径）"""
+            """点「一键翻译」行右侧的 EN 按钮（switchLangVersion 路径）"""
             await page.click(f'#f-lang button[data-v="{code}"]')
             await page.wait_for_timeout(400)
 
@@ -155,34 +151,25 @@ async def main():
         en_msg = await tm()
         check("A1 点 EN 后提示改为 EN版", "EN版" in en_msg["text"], en_msg["text"])
         check("A2 点 EN 后 URL 指向 -en", f"/en/posts/{SLUG}-en/" in en_msg["text"], en_msg["text"])
-        check("A3 点 EN 后无中文版/日文版残留",
-              "日本語版" not in en_msg["text"] and f"/posts/{SLUG}/" not in en_msg["text"], en_msg["text"])
+        check("A3 点 EN 后无中文版残留", f"/posts/{SLUG}/" not in en_msg["text"], en_msg["text"])
 
-        # ---------- B：EN → 日本語 ----------
-        await click_lang("ja")
-        ja_msg = await tm()
-        check("B1 点日本語后提示改为日本語版", "日本語版" in ja_msg["text"], ja_msg["text"])
-        check("B2 点日本語后 URL 指向 -ja", f"/ja/posts/{SLUG}-ja/" in ja_msg["text"], ja_msg["text"])
-        check("B3 点日本語后无 EN版 残留", "EN版" not in ja_msg["text"], ja_msg["text"])
-
-        # ---------- C：日本語 → 中文 ----------
+        # ---------- B：EN → 中文 ----------
         await click_lang("zh")
-        c_msg = await tm()
-        check("C1 切回中文后提示恢复中文版",
-              f"/posts/{SLUG}/" in c_msg["text"] and "EN版" not in c_msg["text"]
-              and "日本語版" not in c_msg["text"], c_msg["text"])
+        b_msg = await tm()
+        check("B1 切回中文后提示恢复中文版",
+              f"/posts/{SLUG}/" in b_msg["text"] and "EN版" not in b_msg["text"], b_msg["text"])
 
-        # ---------- D：另一处换版入口 lang-state 的「EN ✓」 ----------
+        # ---------- C：另一处换版入口 lang-state 的「EN ✓」 ----------
         btn = await page.query_selector('#lang-state button[data-lang="en"]')
         if btn:
             await btn.click()
             await page.wait_for_timeout(400)
-            d_msg = await tm()
-            check("D1 lang-state「EN ✓」切换后提示同步", "EN版" in d_msg["text"], d_msg["text"])
+            c_msg = await tm()
+            check("C1 lang-state「EN ✓」切换后提示同步", "EN版" in c_msg["text"], c_msg["text"])
         else:
-            check("D0 存在 lang-state EN 按钮", False, "未找到按钮")
+            check("C0 存在 lang-state EN 按钮", False, "未找到按钮")
 
-        # ---------- F：翻译填入后的有效提示不被无谓覆盖 ----------
+        # ---------- E：翻译填入后的有效提示不被无谓覆盖 ----------
         await click_lang("zh")
         await page.evaluate("""() => { const el = document.getElementById('tr-msg');
             el.textContent = '✓ 译文已填入。请通读检查后点击「发布」'; el.dataset.kind = 'ok'; }""")
@@ -191,38 +178,31 @@ async def main():
         await page.fill("#f-title", "中文原标题（改）")
         await page.wait_for_timeout(300)
         f_same = (await tm())["text"]
-        check("F1 同版本内编辑不冲掉「译文已填入」提示", f_same == f_before, f"{f_before!r} -> {f_same!r}")
+        check("E1 同版本内编辑不冲掉「译文已填入」提示", f_same == f_before, f"{f_before!r} -> {f_same!r}")
         # 换版本 → 提示已过期，应被刷新为新版本口径
-        await click_lang("ja")
+        await click_lang("en")
         f_after = (await tm())["text"]
-        check("F2 换版本后过期提示被刷新为日本語版",
-              f_after != f_before and "日本語版" in f_after, f"{f_before!r} -> {f_after!r}")
+        check("E2 换版本后过期提示被刷新为 EN版",
+              f_after != f_before and "EN版" in f_after, f"{f_before!r} -> {f_after!r}")
 
-        # ---------- E：目标语言没有对应行 → 提示应为「新建该语言版」口径，不残留旧 URL ----------
-        # 仅保留中文版（+ 一个未发布的英文草稿），EN/日本語 都缺少已发布版本
+        # ---------- D：目标语言没有对应行 → 提示应为「新建该语言版」口径，不残留旧 URL ----------
+        # 仅保留中文版，EN 没有已发布版本
         SCENARIO["rows"] = [
             dict(ROWS[0]),
-            dict(ROWS[1], published=False, published_at=None),  # EN 草稿
         ]
         await page.reload(wait_until="domcontentloaded")
         await page.wait_for_selector("#post-list li", timeout=15000)
         await page.wait_for_timeout(400)
         await page.click("#post-list .wb-item-lang[data-id='r-zh']")
         await page.wait_for_timeout(400)
-        e0 = await tm()
-        check("E0 仅中文行时提示为中文版 URL", f"/posts/{SLUG}/" in e0["text"], e0["text"])
-        await click_lang("ja")   # 日文版整行不存在 → 新建态
-        e1 = await tm()
+        d0 = await tm()
+        check("D0 仅中文行时提示为中文版 URL", f"/posts/{SLUG}/" in d0["text"], d0["text"])
+        await click_lang("en")   # 英文版整行不存在 → 新建态
+        d1 = await tm()
         # switchLangVersion 对「无该语言行」走的是「转入新建态」专文案（比 renderTrMsg 的兜底更具体），
-        # 关键是：必须提到日文、且不得残留中文版 URL
-        check("E1 切到不存在的日文版 → 提示为新建态且无旧 URL",
-              "日文" in e1["text"] and "新建态" in e1["text"] and "/posts/" not in e1["text"], e1["text"])
-        await click_lang("en")   # 英文草稿存在但未发布 → 草稿口径
-        e2 = await tm()
-        # 草稿口径不带 URL（草稿在线上还不可访问，给出 URL 会误导），故只校验语言与状态
-        check("E2 切到英文草稿 → 提示为 EN 草稿未发布且不提 URL",
-              "EN版" in e2["text"] and "草稿" in e2["text"] and "尚未发布" in e2["text"]
-              and "/posts/" not in e2["text"], e2["text"])
+        # 关键是：必须提到英文、且不得残留中文版 URL
+        check("D1 切到不存在的英文版 → 提示为新建态且无旧 URL",
+              "英文" in d1["text"] and "新建态" in d1["text"] and "/posts/" not in d1["text"], d1["text"])
 
         if logs:
             errs = [l for l in logs if l.startswith("pageerror")]

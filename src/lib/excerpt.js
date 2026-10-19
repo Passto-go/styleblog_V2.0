@@ -200,7 +200,7 @@ export async function aiExcerpt({ title, content, lang = 'zh', maxLen = 200, sty
   const body = String(content || '').slice(0, AI_CONTENT_LIMIT);
   if (!body.trim()) throw new Error('正文为空，无法生成摘要');
 
-  const LANG = { zh: '简体中文', en: 'English', ja: '日本語' };
+  const LANG = { zh: '简体中文', en: 'English' };
   const styleText = EXCERPT_STYLE[style] || EXCERPT_STYLE.plain;
 
   const messages = [

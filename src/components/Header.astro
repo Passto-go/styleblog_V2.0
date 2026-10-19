@@ -15,7 +15,7 @@ const nav = [
   { href: L('/archive/'), label: t('nav.archive'), icon: 'archive' },
 ];
 
-// 切换选项始终排除当前语言：zh 页显示 EN/日本語，en 页显示 中文/日本語，ja 页显示 中文/EN
+// 切换选项始终排除当前语言：zh 页显示 EN，en 页显示 中文
 const langList = Object.entries(languages).filter(([code]) => code !== lang);
 ---
 <header class="site-header">

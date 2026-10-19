@@ -4,12 +4,12 @@
 // 站点固定术语表：站名、作者、栏目等专有名词的译法，保证全站译文一致。
 // 可用环境变量 TRANSLATE_GLOSSARY_JSON 覆盖/扩展（JSON 对象，键为原文）。
 const DEFAULT_GLOSSARY = {
-  '吾道一以贯之': { en: 'One Thread Through It All', ja: '吾道一以貫之' },
-  '老一贯': { en: 'Old Yiguan', ja: '老一貫' },
-  '跑步': { en: 'running', ja: 'ランニング' },
+  '吾道一以贯之': { en: 'One Thread Through It All' },
+  '老一贯': { en: 'Old Yiguan' },
+  '跑步': { en: 'running' },
 };
 
-const LANG_NAMES = { en: '英语（English）', ja: '日语（日本語）' };
+const LANG_NAMES = { en: '英语（English）' };
 
 // 单次请求的内容上限（约数）：超过则按二级标题分段翻译，避免超出模型输出长度。
 const SINGLE_SHOT_MAX_CHARS = 4000;
@@ -400,8 +400,8 @@ const CONTEXT_TAIL_CHARS = 400;
 
 // 翻译一篇（或一段）文章。env 提供 OpenAI 兼容端点配置。
 export async function translateArticle({ title, excerpt, content, targetLang }, env) {
-  if (!['en', 'ja'].includes(targetLang)) {
-    throw new Error('仅支持翻译为英文(en)或日文(ja)');
+  if (!['en'].includes(targetLang)) {
+    throw new Error('仅支持翻译为英文(en)');
   }
   const apiKey = env?.TRANSLATE_API_KEY;
   if (!apiKey) {

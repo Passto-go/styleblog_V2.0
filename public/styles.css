@@ -189,6 +189,13 @@ a { color: inherit; }
 .quote-src { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; text-align: right; }
 /* 倒计时：目标名过长时允许换行，避免撑破卡片 */
 .countdown-label { font-size: 14px; color: var(--muted); margin: 0 0 10px; line-height: 1.6; overflow-wrap: anywhere; }
+/* 时区提示：跟读标签同行、不撑高布局，窄屏自动换行也不溢出 */
+.countdown-tz {
+  display: inline-block; margin-left: 6px; padding: 1px 8px;
+  font-size: 11.5px; line-height: 1.5; color: var(--accent);
+  background: var(--accent-soft); border-radius: 999px; white-space: nowrap;
+  vertical-align: baseline;
+}
 .countdown-grid { display: flex; gap: 10px; }
 .cd-cell { flex: 1; min-width: 0; text-align: center; background: var(--surface-2); border-radius: 10px; padding: 10px 4px; }
 .cd-num { font-size: 22px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; line-height: 1.25; }
@@ -843,12 +850,37 @@ a { color: inherit; }
   margin-top: 40px; color: var(--muted); font-size: 13px;
   border-top: 1px solid var(--border); background: var(--bg-soft);
 }
-.footer-inner { max-width: var(--wrap); margin: 0 auto; padding: 28px 20px; }
+/* 左：版权/托管信息；右：北京时间区块（内容在区块内居中） */
+.footer-inner {
+  max-width: var(--wrap); margin: 0 auto; padding: 28px 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px 28px; flex-wrap: wrap;
+}
 .footer-nav { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 16px; }
 .footer-nav a { color: var(--nav-text); text-decoration: none; transition: color .15s; }
 .footer-nav a:hover { color: var(--accent); }
+.footer-meta { flex: 1 1 auto; min-width: 0; }
 .footer-meta p { margin: 4px 0; }
 .footer-meta a { color: var(--accent); text-decoration: none; }
+/* 页脚时钟：锁定北京时间（UTC+8），等宽数字防秒级跳动，nowrap 防窄屏换行溢出 */
+.footer-clock {
+  flex: 0 0 auto; margin-left: auto; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
+}
+.footer-clock-label { font-size: 11px; letter-spacing: .5px; color: var(--muted); white-space: nowrap; }
+.footer-clock-time {
+  font-size: 19px; font-weight: 700; color: var(--text-strong); line-height: 1.2;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.footer-clock-date { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.footer-clock-date span + span { margin-left: 6px; }
+/* 窄屏：页脚改上下堆叠，时钟整体居中；超窄屏隐藏星期，日期保持单行不溢出 */
+@media (max-width: 640px) {
+  .footer-inner { flex-direction: column; align-items: stretch; gap: 14px; padding: 22px 16px; }
+  .footer-clock { margin: 0 auto; }
+}
+@media (max-width: 360px) {
+  .footer-clock-weekday { display: none; }
+}
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 920px) {

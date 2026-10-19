@@ -48,8 +48,9 @@ function normalize(p) {
 }
 
 // 文章为「语言中立」：同一篇文章在所有语言视图下都展示，仅 UI 文案随语言切换。
-// 同一篇文章的多个语言版本按「基准 slug」归组（hello / hello-en / hello-ja 的基准都是 hello），
-// 每个语言视图只挑选最匹配的一个版本展示，避免列表出现同篇多语言的重复条目。
+// 同一篇文章的多个语言版本按「基准 slug」归组（hello / hello-en 的基准都是 hello；
+// 历史遗留的 hello-ja 也归一到 hello），每个语言视图只挑选最匹配的一个版本展示，
+// 避免列表出现同篇多语言的重复条目。
 export async function getPosts(lang = 'zh') {
   const all = (await fetchAll()).map(normalize);
   return pickPerArticle(all, lang);
@@ -114,7 +115,7 @@ function pickLangVersion(versions, lang) {
 // 同时兼容两种翻译命名约定：
 //   ① 「同 slug + lang 字段」：英文版 slug 与中文版相同，靠 lang='en' 区分
 //   ② 「slug 后缀」：英文版 slug 为 base-en（后台未提供语言选择，lang 常为默认 'zh'）
-// 中文视图优先解析基准 slug，避免误命中 -en/-ja 版本；非中文视图优先 slug 后缀约定。
+// 中文视图优先解析基准 slug，避免误命中 -en（及历史 -ja）版本；非中文视图优先 slug 后缀约定。
 export async function getPost(slug, lang = 'zh') {
   const all = (await fetchAll()).map(normalize);
   const base = baseSlug(slug);
@@ -138,7 +139,7 @@ export async function getPost(slug, lang = 'zh') {
 
 // 其它语言视图下「相邻文章」的展示标题：优先用该文章在目标语言下的已发布版本标题。
 // 背景：getAllPosts(lang) 里缺译文的条目会回退其它语言版本（中文原文兜底），
-// 于是英文/日文文章页的「上一篇 / 下一篇」会直接露出中文标题。这里在展示层做一次
+// 于是英文文章页的「上一篇 / 下一篇」会直接露出中文标题。这里在展示层做一次
 // 标题级回退：有译文用译文标题，无译文保持原文标题（不隐藏导航、不改变相邻关系）。
 // 相邻关系本身与语言无关，因此仅替换标题、不动顺序与链接。
 export function titleResolver(allRows, lang) {
@@ -170,9 +171,7 @@ export function hasVersion(group, base, lang) {
 }
 
 // 正文语言级联（详情页用）：
-//   目标语言有译文 → 目标；否则（目标≠en 且有英文译文）→ 英文；否则中文原文。
-//   刻意不对称：英语缺失只退中文（对英语读者退日文更冷门）；
-//   日语缺失先退英文（日本读者英语接受度最高，且英文版是「次优成品」）。
+//   目标语言有译文 → 目标；否则中文原文（英语缺失直接退中文）。
 export function pickDisplayLang(group, base, lang) {
   if (hasVersion(group, base, lang)) return lang;
   if (lang !== 'en' && hasVersion(group, base, 'en')) return 'en';
@@ -196,14 +195,14 @@ export async function getPostWithVersions(slug, lang = 'zh') {
     return row ? row.slug : null;
   };
 
-  const available = { en: hasVersion(group, base, 'en'), ja: hasVersion(group, base, 'ja') };
+  const available = { en: hasVersion(group, base, 'en') };
   const displayLang = pickDisplayLang(group, base, lang);
   const post = (displayLang && pickLangVersion(group, displayLang)) || group[0];
   return {
     post,
     displayLang: displayLang || 'zh',
     available,
-    siblings: { en: versionSlug('en'), ja: versionSlug('ja') },
+    siblings: { en: versionSlug('en') },
     base,
   };
 }
@@ -255,14 +254,13 @@ export { site as siteConfig };
 // 以 categories 注册表为「名称/Slug 权威源」，叠加已发布文章的实际计数；
 // 注册表缺失或查询失败时，降级为纯文章推导，保证站点不崩。
 //
-// 多语言名称：categories 表用 name(中文) / name_en / name_ja 三列分别存，
+// 多语言名称：categories 表用 name(中文) / name_en 两列分别存，
 // 这里按当前 lang 选出对应名称并回退中文（缺失绝不显示空白）。
-// 注意 slug 是全站唯一标识，与语言无关——三语共用同一个分类 slug。
+// 注意 slug 是全站唯一标识，与语言无关——中英共用同一个分类 slug。
 export function pickCategoryName(row, lang = 'zh') {
   if (!row) return '';
   const zh = (row.name || '').trim();
   if (lang === 'en') return (row.name_en || '').trim() || zh || row.slug || '';
-  if (lang === 'ja') return (row.name_ja || '').trim() || zh || row.slug || '';
   return zh || row.slug || '';
 }
 
@@ -282,13 +280,13 @@ export async function getCategories(lang = 'zh', opts = {}) {
   let registry = [];
   try {
     const supabase = createClient(URL, KEY, { auth: { persistSession: false } });
-    // 先尝试带多语言列查询；若数据库尚未执行迁移（无 name_en/name_ja 列），
+    // 先尝试带多语言列查询；若数据库尚未执行迁移（无 name_en 列），
     // 回退为只取 name，保证上线顺序不受影响（先发代码、后执行 SQL 也不会 500）。
     let { data, error } = await supabase
       .from('categories')
-      .select('name, name_en, name_ja, slug')
+      .select('name, name_en, slug')
       .order('created_at', { ascending: true });
-    if (error && /name_en|name_ja|column/i.test(error.message || '')) {
+    if (error && /name_en|column/i.test(error.message || '')) {
       ({ data, error } = await supabase
         .from('categories')
         .select('name, slug')
@@ -304,12 +302,11 @@ export async function getCategories(lang = 'zh', opts = {}) {
   for (const r of registry) {
     if (!r.slug) continue;
     map.set(r.slug, {
-      // name = 当前语言下的显示名；names = 三语全量（后台/其他地方复用）
+      // name = 当前语言下的显示名；names = 中英全量（后台/其他地方复用）
       name: pickCategoryName(r, lang),
       names: {
         zh: (r.name || '').trim(),
         en: (r.name_en || '').trim(),
-        ja: (r.name_ja || '').trim(),
       },
       slug: r.slug,
       count: 0,
@@ -323,7 +320,7 @@ export async function getCategories(lang = 'zh', opts = {}) {
       const fallback = sample?.category || slug;
       map.set(slug, {
         name: fallback,
-        names: { zh: sample?.category || '', en: '', ja: '' },
+        names: { zh: sample?.category || '', en: '' },
         slug,
         count: 0,
         fromRegistry: false,
@@ -380,7 +377,7 @@ export function slugify(str) {
     .replace(/[^\w\-\u4e00-\u9fa5]/g, '');
 }
 
-// 去掉语言后缀（-en/-ja）得到基准 slug：hello-en / hello-ja -> hello
+// 去掉语言后缀得到基准 slug：hello-en -> hello（-ja 仅用于兼容历史日文 slug）
 export function baseSlug(slug) {
   return String(slug).replace(/-(en|ja)$/, '');
 }

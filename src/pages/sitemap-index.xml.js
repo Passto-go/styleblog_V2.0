@@ -1,11 +1,11 @@
 import { getAllPostsEveryLang, getAllCategorySlugs } from '../lib/posts.js';
 
-const LANGS = ['zh', 'en', 'ja'];
+const LANGS = ['zh', 'en'];
 
 // 每种语言的静态页（zh 用无前缀根路径）
 const staticPaths = ['/', '/about/', '/categories/', '/archive/', '/search/'];
 
-// 文章 URL 前缀：zh 无前缀，en/ja 带语言段
+// 文章 URL 前缀：zh 无前缀，en 带语言段
 const prefix = (lang, path) => (lang === 'zh' ? path : `/${lang}${path}`);
 
 export async function GET(context) {

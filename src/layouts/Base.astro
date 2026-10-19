@@ -20,13 +20,12 @@ const desc = description || t('site.description');
 
 const path = Astro.url.pathname;
 const canonical = Astro.site ? new URL(path, Astro.site).href : path;
-// path 是当前已本地化的路径（如 /ja/archive/），需先还原成默认语言基准路径，再分别本地化
-const basePath = path.replace(/^\/(en|ja)(?=\/|$)/, '') || '/';
+// path 是当前已本地化的路径（如 /en/archive/），需先还原成默认语言基准路径，再分别本地化
+const basePath = path.replace(/^\/(en)(?=\/|$)/, '') || '/';
 // langHrefs（文章页传入）：目标语言对应文章的真实地址；缺省回退按基准路径本地化
 const altFor = (l) => (langHrefs && langHrefs[l]) || localizePath(basePath, l);
 const zhHref = altFor('zh');
 const enHref = altFor('en');
-const jaHref = altFor('ja');
 
 // ---- 社交分享（Open Graph / Twitter Card）----
 // 抓取器只认「绝对 URL」的图片地址；未指定时回退到站点默认分享图
@@ -61,7 +60,6 @@ const ogImage = image
 
     <link rel="alternate" hreflang="zh-CN" href={zhHref} />
     <link rel="alternate" hreflang="en" href={enHref} />
-    <link rel="alternate" hreflang="ja" href={jaHref} />
     <link rel="alternate" hreflang="x-default" href={zhHref} />
 
     <link rel="alternate" type="application/rss+xml" title="RSS" href="/rss.xml" />

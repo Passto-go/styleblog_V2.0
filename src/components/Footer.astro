@@ -1,5 +1,5 @@
 ---
-import { useTranslations, localizePath } from '../i18n/ui.js';
+import { useTranslations } from '../i18n/ui.js';
 import { site } from '../data/site.js';
 
 const { lang } = Astro.props;
@@ -19,5 +19,36 @@ const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
       </p>
       <p>Hosted by <a href={site.hostedBy.url} target="_blank" rel="noopener">{site.hostedBy.name}</a></p>
     </div>
+    <div class="footer-clock">
+      <span class="footer-clock-label">{t('footer.clock')}</span>
+      <span class="footer-clock-time" id="footer-clock-time">--:--:--</span>
+      <span class="footer-clock-date">
+        <span id="footer-clock-date"></span>
+        <span class="footer-clock-weekday" id="footer-clock-weekday"></span>
+      </span>
+    </div>
   </div>
 </footer>
+
+<script define:vars={{ lang }}>
+  (function () {
+    var timeEl = document.getElementById('footer-clock-time');
+    var dateEl = document.getElementById('footer-clock-date');
+    var weekdayEl = document.getElementById('footer-clock-weekday');
+    if (!timeEl || !dateEl) return;
+    // 始终锁定北京时间（UTC+8）——与访客本地时区无关，任何设备读数一致
+    var TZ = 'Asia/Shanghai';
+    var locale = lang === 'en' ? 'en-US' : 'zh-CN';
+    var timeFmt = new Intl.DateTimeFormat(locale, { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    var dateFmt = new Intl.DateTimeFormat(locale, { timeZone: TZ, year: 'numeric', month: 'short', day: 'numeric' });
+    var weekdayFmt = new Intl.DateTimeFormat(locale, { timeZone: TZ, weekday: 'short' });
+    function tick() {
+      var now = new Date();
+      timeEl.textContent = timeFmt.format(now);
+      dateEl.textContent = dateFmt.format(now);
+      if (weekdayEl) weekdayEl.textContent = weekdayFmt.format(now);
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+</script>

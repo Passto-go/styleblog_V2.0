@@ -77,8 +77,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (content.length > MAX_CONTENT) {
       return json({ error: `正文超过 ${MAX_CONTENT} 字，请拆成多篇` }, 400);
     }
-    if (!['zh', 'en', 'ja'].includes(lang)) {
-      return json({ error: '文章语言仅支持 zh / en / ja' }, 400);
+    if (!['zh', 'en'].includes(lang)) {
+      return json({ error: '文章语言仅支持 zh / en' }, 400);
     }
     if (!['plain', 'points', 'hook'].includes(style)) {
       return json({ error: '风格参数无效' }, 400);

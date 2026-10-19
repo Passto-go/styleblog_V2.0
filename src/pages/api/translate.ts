@@ -75,8 +75,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!title || !content.trim()) {
       return json({ error: '标题和正文不能为空' }, 400);
     }
-    if (!['en', 'ja'].includes(targetLang)) {
-      return json({ error: '目标语言仅支持 en（英文）或 ja（日文）' }, 400);
+    if (!['en'].includes(targetLang)) {
+      return json({ error: '目标语言仅支持 en（英文）' }, 400);
     }
     if (content.length > MAX_CONTENT) {
       return json({ error: `正文超过 ${MAX_CONTENT} 字，请拆成多篇或手动分段翻译` }, 400);

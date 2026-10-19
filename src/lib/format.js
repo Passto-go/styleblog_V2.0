@@ -1,6 +1,6 @@
 export function formatDate(iso, lang = 'zh') {
   const d = new Date(iso);
-  const locale = lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN';
+  const locale = lang === 'en' ? 'en-US' : 'zh-CN';
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
@@ -12,6 +12,6 @@ export function monthKey(iso) {
 
 export function monthLabel(iso, lang = 'zh') {
   const d = new Date(iso);
-  const locale = lang === 'en' ? 'en-US' : lang === 'ja' ? 'ja-JP' : 'zh-CN';
+  const locale = lang === 'en' ? 'en-US' : 'zh-CN';
   return d.toLocaleDateString(locale, { year: 'numeric', month: 'long' });
 }

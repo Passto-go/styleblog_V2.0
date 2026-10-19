@@ -5,10 +5,10 @@
 导致英文/日文文章页的上下篇导航露出中文标题。本次修复只改展示层标题。
 
 验证点：
-  A. 三种语言视图下导航文案来自 i18n（zh 上一篇/下一篇、en Previous/Next、ja 前の記事/次の記事）
+  A. 两种语言视图下导航文案来自 i18n（zh 上一篇/下一篇、en Previous/Next）
   B. 导航标题：目标语言有译文则必须是译文标题、且不含中日文字符（除专有名词）
   C. 导航链接：语言前缀正确、目标页 200、且 == 该语言视图中真实的相邻文章
-  D. 跨语言交叉：同一篇文章在三种语言页上的相邻「文章身份」一致（相邻关系与语言无关）
+  D. 跨语言交叉：同一篇文章在中英两个语言页上的相邻「文章身份」一致（相邻关系与语言无关）
   E. 边界：首篇无上一篇、末篇无下一篇、占位项不可点击
   F. 回归：文章页正文标题不被替换（只影响导航展示层）
 
@@ -21,12 +21,11 @@ import urllib.request
 from playwright.async_api import async_playwright
 
 BASE = "http://localhost:4400"
-LANGS = ["zh", "en", "ja"]
-PREFIX = {"zh": "/posts/", "en": "/en/posts/", "ja": "/ja/posts/"}
+LANGS = ["zh", "en"]
+PREFIX = {"zh": "/posts/", "en": "/en/posts/"}
 LABEL = {
     "zh": {"prev": "← 上一篇", "next": "下一篇 →"},
     "en": {"prev": "← Previous", "next": "Next →"},
-    "ja": {"prev": "← 前の記事", "next": "次の記事 →"},
 }
 CJK = re.compile(r"[\u4e00-\u9fff\u3040-\u30ff]")
 
@@ -107,8 +106,8 @@ async def main():
                 check(f"{lang} {p} {key} 链接前缀", it["href"].startswith(PREFIX[lang]), it["href"])
                 code, _ = get(it["href"])
                 check(f"{lang} {p} {key} 目标页可达", code == 200, f"{it['href']} -> {code}")
-                # 标题语言：中文页应为中文；英日页允许专有名词，但不得整条是中文标题
-                if lang in ("en", "ja"):
+                # 标题语言：中文页应为中文；英文页允许专有名词，但不得整条是中文标题
+                if lang == "en":
                     # 与中文页同篇导航标题对比：若完全一致，需确认该文章本身在目标
                     # 语言下的标题就与中文相同（如 "Hello World" 这类原名不变的标题），
                     # 否则说明回退逻辑没生效。
@@ -131,7 +130,7 @@ async def main():
         if not zh:
             continue
         zh_partners = {k: (zh[k]["title"] if zh[k] else None) for k in ("prev", "next")}
-        for lang in ("en", "ja"):
+        for lang in ("en",):
             other = navs.get((lang, p))
             if not other:
                 continue
@@ -153,7 +152,7 @@ async def main():
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
         page = await browser.new_page(viewport={"width": 1280, "height": 900})
-        for lang in ("en", "ja"):
+        for lang in ("en",):
             for p in posts:
                 st, _ = get(f"{PREFIX[lang]}{p}/")
                 if st != 200:

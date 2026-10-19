@@ -74,7 +74,6 @@ const t = useTranslations(lang);
     const labels = {
       zh: { reading: '正在加载…', tip: '输入关键词开始搜索。', no: '没有找到相关文章。', found: (n) => `找到 ${n} 篇相关文章` },
       en: { reading: 'Loading…', tip: 'Type a keyword to start searching.', no: 'No matching posts found.', found: (n) => `${n} posts found` },
-      ja: { reading: '読み込み中…', tip: 'キーワードを入力して検索。', no: '該当する記事が見つかりませんでした。', found: (n) => `${n} 件の記事が見つかりました` },
     };
     const L = labels[lang] || labels.zh;
     const tipNo = L.no;
