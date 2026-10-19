@@ -147,7 +147,7 @@ npm run dev          # 打开 http://localhost:4321
    - **`supabase/schema.sql`**：建 `posts` / `comments`（含 `add_comment`、`list_my_comments`、`delete_own_comment` 三个 RPC）/ `site_settings` / `category_aliases` 表，配置 RLS、图床桶 `images`、Realtime。
    - **`supabase/categories.sql`**：建 `categories` 注册表，自愈历史脏数据，并把现有文章去重分类种子化进去。
    - **`supabase/posts_author.sql`**：给 `posts` 增加 `author` 列（文章作者字段；不加此列时后台「发布 / 存草稿」会报错）。
-   - **`supabase/encryption.sql`**（可选，要用文章加密才需执行）：给 `posts` 增加 `is_encrypted / pass_hash / pass_hint` 三列与 `post_check_password` 等 3 个 `security definer` RPC（启用 pgcrypto），并把 anon 角色对这三列的权限收窄。
+   - **`supabase/encryption.sql`**（可选，要用文章加密才需执行；**v2 起注意执行顺序：先部署代码再跑 SQL**）：给 `posts` 增加 `is_encrypted / pass_hash / pass_hint` 三列与 `post_check_password` 等 3 个 `security definer` RPC（启用 pgcrypto、bcrypt cost 10），把 anon 角色对 `pass_hash` 列的权限收窄（列级 revoke，防 anon 直连 REST 拖哈希）。v2 修复了首版在 Supabase 上 `crypt()` 不可解析（pgcrypto 预装在 `extensions` 模式）导致设密码/校验全部 500 的问题。
 3. 进入 **Project Settings → API**，复制 `Project URL` 与 `anon public` key。
 4. 复制 `.env.example` 为 `.env` 并填入：
 

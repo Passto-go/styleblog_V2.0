@@ -2167,7 +2167,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
         // is_encrypted 继承：从已加密的文章切到新语言版（新建态）时，新行随整组
         // 一同上锁（组级口径：同一把锁）。未加密文章传 undefined，键被 JSON 丢弃，
         // 不碰该列——数据库尚未执行 encryption.sql 时也不会报错。
-        const r = await supabase.from('posts').insert({ ...row, is_encrypted: state.wasEncrypted || undefined, published_at: row.published_at || new Date().toISOString() });
+        // .select('id')：insert 默认返回整行（含 pass_hash，已 revoke 会报权限错），
+        // 显式只要 id。
+        const r = await supabase.from('posts')
+          .insert({ ...row, is_encrypted: state.wasEncrypted || undefined, published_at: row.published_at || new Date().toISOString() })
+          .select('id');
         error = r.error;
         if (!error && r.data?.[0]) state.id = r.data[0].id;
       }
@@ -2484,11 +2488,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       if (purged > 0) setMsg(`已自动清理 ${purged} 篇超期文章及其关联文件`, 'ok');
     } catch (e) { /* 函数未部署或网络异常：忽略，不阻塞列表 */ }
 
-    const query = supabase
-      .from('posts').select('*').order('published_at', { ascending: false });
-    let { data, error } = await query;
+    // 显式列清单（不含 pass_hash）：该列已对 anon/authenticated revoke，
+    // select('*') 会报权限错；显式列举同时兼容缺加密列的旧库（自动回退全列）。
+    const POST_COLS = 'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint';
+    let { data, error } = await supabase
+      .from('posts').select(POST_COLS).order('published_at', { ascending: false });
+    if (error && /does not exist/i.test(error.message || '')) {
+      // 旧库未执行 encryption.sql：回退全列（此时也没有 pass_hash 权限收窄）
+      ({ data, error } = await supabase
+        .from('posts').select('*').order('published_at', { ascending: false }));
+    }
     if (error) { $('post-list').innerHTML = '<li class="wb-empty">读取失败：' + error.message + '</li>'; return; }
-    // pass_hash 不进入后台前端（bcrypt 不可逆，管理员也无需看到；与读者侧同一口径）
+    // pass_hash 不进入后台前端（双保险：查询层已不取该列，此处再挡一道）
     allPosts = (data || []).map(({ pass_hash, ...rest }) => rest);
     loadCategoryOptions();
     renderList();

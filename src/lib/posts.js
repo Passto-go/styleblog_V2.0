@@ -19,6 +19,14 @@ function sbClient(extra) {
   });
 }
 
+// posts 表显式列清单（不含 pass_hash）：
+// ① pass_hash 已对 anon/authenticated revoke（encryption.sql v2），select('*') 会报
+//    权限错——不设防时 anon 可直连 REST 拖走全部 bcrypt 哈希做离线爆破；
+// ② 显式列举让「缺列」可被识别，从而在未执行旧迁移的库上逐级降级。
+// 注意：将来给 posts 加列且前端要读时，需同步补进本清单。
+const POST_COLS =
+  'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint';
+
 // 构建时（服务端）从 Supabase 拉取已发布文章。
 // 未配置或拉取失败则回退到本地示例数据，保证站点始终能构建。
 async function fetchAll() {
@@ -27,24 +35,35 @@ async function fetchAll() {
     return samplePosts;
   }
   const supabase = sbClient();
-  // 显式排除垃圾箱文章（deleted_at is null）：RLS 已据此过滤，此处再挡一道，
-  // 即使策略未及时更新也安全。若数据库尚未执行 posts_trash.sql（无该列），
-  // 回退为不带该条件的查询，避免整个前台因缺列而取不到文章。
-  let query = supabase
-    .from('posts')
-    .select('*')
-    .eq('published', true);
-  let { data, error } = await query.is('deleted_at', null).order('published_at', { ascending: false });
-  if (error && /deleted_at/.test(error.message || '')) {
-    console.warn('[posts] 未找到 deleted_at 列（请执行 supabase/posts_trash.sql），回退查询');
-    ({ data, error } = await query.order('published_at', { ascending: false }));
+  // 逐级降级（显式排除垃圾箱文章 deleted_at is null：RLS 已据此过滤，此处再挡一道，
+  // 即使策略未及时更新也安全）：
+  //   ① 显式列 + 排除垃圾箱   —— 正常库（现行形态）
+  //   ② 显式列、不限垃圾箱    —— 缺 deleted_at 列的旧库
+  //   ③ '*' + 排除垃圾箱      —— 缺加密列的旧库（未执行 encryption.sql）
+  //   ④ '*'、不限垃圾箱       —— 既缺 deleted_at 又缺加密列的旧库
+  //   ⑤⑥ 再兜一轮显式列       —— ③④ 因 pass_hash 权限被拒时自愈（revoke 已生效）
+  // 缺列 / 权限拒绝才逐级换形态；网络错误、5xx 等直接降级示例数据（与历史行为一致）。
+  const attempts = [
+    [POST_COLS, true],
+    [POST_COLS, false],
+    ['*', true],
+    ['*', false],
+    [POST_COLS, true],
+    [POST_COLS, false],
+  ];
+  for (const [cols, withTrash] of attempts) {
+    let q = supabase.from('posts').select(cols).eq('published', true);
+    if (withTrash) q = q.is('deleted_at', null);
+    const { data, error } = await q.order('published_at', { ascending: false });
+    if (!error) return data ?? [];
+    const msg = error.message || '';
+    if (!/does not exist|permission denied/i.test(msg)) {
+      console.warn('[posts] 拉取失败，回退示例数据:', msg);
+      return samplePosts;
+    }
   }
-
-  if (error) {
-    console.warn('[posts] 拉取失败，回退示例数据:', error.message);
-    return samplePosts;
-  }
-  return data ?? [];
+  console.warn('[posts] 所有列形态均拉取失败，回退示例数据');
+  return samplePosts;
 }
 
 const byDateDesc = (a, b) =>

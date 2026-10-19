@@ -12,7 +12,9 @@ astro dev 通过 .env.local 把 PUBLIC_SUPABASE_URL 指到本服务（默认 559
                                      （专门覆盖「只加密中文行」的组级锁定路径）
   · draft-post（zh 一行）           草稿，验证草稿不可见
 
-运行：python3 scripts/mock_supabase.py [port]
+运行：python3 scripts/mock_supabase.py [port] [--old-db]
+  --old-db  模拟未执行 encryption.sql 的旧库：响应行不带加密三列；
+            显式 select 这三列时按 PostgREST 语义报 42703（select=* 不报错，只返回既有列）。
 """
 import json
 import re
@@ -21,9 +23,15 @@ import bcrypt
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 5599
+PORT = 5599
+OLD_DB = "--old-db" in sys.argv[2:]
+for _i, _a in enumerate(sys.argv[1:], start=1):
+    if _a.isdigit():
+        PORT = int(_a)
 SECRET_PW = "correct-horse"
 SECRET_HASH = bcrypt.hashpw(SECRET_PW.encode(), bcrypt.gensalt(rounds=6)).decode()
+
+ENC_COLS = ("is_encrypted", "pass_hash", "pass_hint")
 
 NOW = "2026-10-10T00:00:00+00:00"
 
@@ -135,7 +143,11 @@ def base_of(slug: str) -> str:
 
 def public_posts():
     """模拟 RLS：仅已发布且未进垃圾箱的行对 anon 可见。"""
-    return [p for p in POSTS if p["published"] and p["deleted_at"] is None]
+    rows = [p for p in POSTS if p["published"] and p["deleted_at"] is None]
+    if OLD_DB:
+        # 旧库形态：没有加密三列（响应体直接不含这些字段）
+        rows = [{k: v for k, v in r.items() if k not in ENC_COLS} for r in rows]
+    return rows
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -155,6 +167,15 @@ class Handler(BaseHTTPRequestHandler):
         path = u.path
         qs = parse_qs(u.query)
         if path == "/rest/v1/posts":
+            # PostgREST 语义：显式 select 不存在的列 → 42703；select=* → 只返回既有列
+            if OLD_DB:
+                sel = (qs.get("select", [""])[0] or "")
+                if sel != "*":
+                    missing = [c for c in ENC_COLS if c in sel]
+                    if missing:
+                        self._json({"code": "42703", "details": None, "hint": None,
+                                    "message": f"column posts.{missing[0]} does not exist"}, 400)
+                        return
             rows = public_posts()
             # 尽力模拟常见过滤参数（应用侧还会再过滤，这里只为贴近真实）
             if qs.get("published", [None])[0] == "eq.true":
@@ -181,6 +202,10 @@ class Handler(BaseHTTPRequestHandler):
             body = {}
 
         if path == "/rest/v1/rpc/post_check_password":
+            if OLD_DB:
+                # 旧库没有该函数（encryption.sql 未执行）
+                self._json({"code": "PGRST202", "message": "Could not find the function public.post_check_password(text, text) in the schema cache."}, 404)
+                return
             p_base = str(body.get("p_base") or "")
             p_pw = str(body.get("p_pw") or "")
             ok = False
@@ -206,5 +231,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"[mock] Supabase mock on http://127.0.0.1:{PORT}  (secret pw = {SECRET_PW!r})")
+    print(f"[mock] Supabase mock on http://127.0.0.1:{PORT}  (secret pw = {SECRET_PW!r})"
+          + ("  [OLD-DB MODE: 无加密三列]" if OLD_DB else ""))
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

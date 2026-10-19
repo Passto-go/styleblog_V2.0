@@ -48,6 +48,8 @@
 
    > `UNLOCK_SECRET` 有两种配法，代码双路兼容（运行时优先）：**① Secret（推荐）**：Settings → Variables and Secrets → Add（Type: Secret），改密钥免重建；**② 构建变量**：加进上表，值随构建内联进 Worker。
 
+   > ⚠️ **文章加密的数据库迁移（`supabase/encryption.sql` v2）必须先部署代码、后执行 SQL**：SQL 含 `pass_hash` 列级 revoke，旧代码的 `select('*')` 会因此报权限错而降级成示例数据。代码上线并确认页面正常后再跑 SQL。
+
 5. **Save and Deploy**，约 1–3 分钟得到 `https://<项目名>.workers.dev`
 6. 以后**只有改代码才需要 push**；发文不触发任何构建
 
