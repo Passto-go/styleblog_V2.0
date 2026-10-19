@@ -49,6 +49,8 @@
    > `UNLOCK_SECRET` 有两种配法，代码双路兼容（运行时优先）：**① Secret（推荐）**：Settings → Variables and Secrets → Add（Type: Secret），改密钥免重建；**② 构建变量**：加进上表，值随构建内联进 Worker。
 
    > ⚠️ **文章加密的数据库迁移（`supabase/encryption.sql` v2）必须先部署代码、后执行 SQL**：SQL 含 `pass_hash` 列级 revoke，旧代码的 `select('*')` 会因此报权限错而降级成示例数据。代码上线并确认页面正常后再跑 SQL。
+   >
+   > ✅ **收尾建议（2026-10 已上线验证）**：跑完 `encryption.sql` 后再执行 `supabase/encryption_hash_private.sql`——它把 `pass_hash` 哈希迁入 `private` 模式私有表并删除 `posts.pass_hash` 列，从结构上消除列级权限的暴露面（线上实测 `?select=pass_hash` 直接返回 42703 列不存在），上述 revoke 顺序坑也随之 moot。三件套都可重复执行（幂等）。
 
 5. **Save and Deploy**，约 1–3 分钟得到 `https://<项目名>.workers.dev`
 6. 以后**只有改代码才需要 push**；发文不触发任何构建
