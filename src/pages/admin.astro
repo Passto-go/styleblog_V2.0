@@ -96,14 +96,18 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               </div>
 
               <div class="wb-toolbar">
-                <label class="wb-upload" title="上传图片插入正文（正文插图）">
-                  插入图片
+                <label class="wb-upload" title="上传本地图片插入正文（正文插图）">
+                  插入本地图片
                   <input id="f-image" type="file" accept="image/*" multiple hidden />
                 </label>
-                <label class="wb-upload wb-upload-att" title="上传文件作为文章附件：展示在正文页底部「附件」区，仅文件名、点击下载，不进正文">
-                  上传附件
+                <button id="pick-image-btn" class="wb-upload wb-upload-pick" type="button"
+                  title="从「已上传」的图片中选择并插入正文，不会重新上传">插入已上传图片</button>
+                <label class="wb-upload wb-upload-att" title="上传本地文件作为文章附件：展示在正文页底部「附件」区，仅文件名、点击下载，不进正文">
+                  上传本地附件
                   <input id="f-attach" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip,image/*" multiple hidden />
                 </label>
+                <button id="pick-attach-btn" class="wb-upload wb-upload-pick" type="button"
+                  title="从「已上传」的附件中选择一个链接插入正文，不会重新上传">插入已上传附件</button>
                 <span id="upload-msg" class="wb-hint"></span>
                 <span id="attach-msg" class="wb-hint"></span>
               </div>
@@ -1181,11 +1185,32 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       del.className = 'wb-item-del';
       del.textContent = '删除';
       del.onclick = async () => {
-        if (!confirm('删除文件「' + (m.original_name || m.path) + '」？\n若它仍被文章引用，文章中将出现坏链。')) return;
-        del.disabled = true; del.textContent = '删除中…';
+        // 引用检查：仍被文章正文/封面引用时阻止删除，避免删除后文章出现坏链
+        del.disabled = true; del.textContent = '检查中…';
+        const refs = await findReferences(m.path);
+        if (refs.length) {
+          del.disabled = false; del.textContent = '删除';
+          alert(
+            `无法删除：该文件仍被 ${refs.length} 篇文章引用。\n\n` +
+            refsToText(refs) + `\n\n` +
+            `如确需删除，请先在对应文章中移除对它的引用（图片或链接），再回来删除。\n` +
+            `这样可避免文章中的图片/附件出现失效链接。`
+          );
+          return;
+        }
+        if (!confirm('删除文件「' + (m.original_name || m.path) + '」？\n该文件当前没有被任何文章引用，删除不影响线上内容。')) {
+          del.disabled = false; del.textContent = '删除';
+          return;
+        }
+        del.textContent = '删除中…';
         const { error: e1 } = await supabase.storage.from(m.bucket).remove([m.path]);
         if (e1) { alert('删除失败：' + e1.message); del.disabled = false; del.textContent = '删除'; return; }
         await supabase.from('media').delete().eq('path', m.path);
+        // 若当前编辑器正文里仍残留该路径（尚未保存的改动），提醒一下
+        const ta = $('f-content');
+        if (ta && ta.value.includes(m.path)) {
+          alert('注意：当前正在编辑的文章正文里仍包含该文件路径，保存后会出现失效链接，请一并删除。');
+        }
         await loadMedia();
       };
 
@@ -1195,6 +1220,30 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     });
   }
 
+  // ---------- 删除前的引用检查（与 loadMedia 孤儿判定同口径） ----------
+  // 返回仍引用该文件 path 的文章列表：[{ title, slug, lang }]。
+  // 「引用」口径与孤儿检测完全一致：posts.content 或 posts.cover 包含该 path。
+  // 用途：删除文件前拦截——一旦删掉，这些文章的图片/链接就会立刻 404。
+  async function findReferences(path) {
+    if (!path) return [];
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('title, slug, lang, content, cover, deleted_at');
+      if (error || !data) return [];
+      return data
+        .filter((p) => !p.deleted_at)                       // 回收站里的文章不算线上引用
+        .filter((p) => ((p.content || '') + '\n' + (p.cover || '')).includes(path))
+        .map((p) => ({ title: p.title || p.slug, slug: p.slug, lang: p.lang || 'zh' }));
+    } catch { return []; }
+  }
+
+  // 组织引用提示文案：列出前若干篇，超出则省略
+  function refsToText(refs) {
+    const shown = refs.slice(0, 5).map((r) => `《${r.title}》`).join('、');
+    return refs.length > 5 ? `${shown} 等 ${refs.length} 篇文章` : shown;
+  }
+
   // 清理孤儿文件：仅删「media 有记录、正文与封面均无引用」的文件，逐个尝试，最后汇总
   async function cleanOrphans() {
     const msg = $('fm-msg');
@@ -1202,14 +1251,20 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     if (!list.length) { msg.textContent = '没有孤儿文件 ✓'; return; }
     if (!confirm(`清理 ${list.length} 个孤儿文件？\n它们未被任何文章的正文、封面引用，也不是已归属文章的附件，删除不可恢复。`)) return;
     msg.textContent = '清理中…';
-    let done = 0, fail = 0;
+    let done = 0, fail = 0, blocked = 0;
     for (const m of list) {
+      // 逐条实时复核：loadMedia 之后若有人新发布了引用该文件的文章，
+      // orphanPaths 就是过期快照，直接用会误删。这里以数据库当前内容为准。
+      const refs = await findReferences(m.path);
+      if (refs.length) { blocked++; continue; }
       const { error } = await supabase.storage.from(m.bucket).remove([m.path]);
       if (error) { fail++; continue; }
       await supabase.from('media').delete().eq('path', m.path);
       done++;
     }
-    msg.textContent = `已清理 ${done} 个${fail ? '，失败 ' + fail + ' 个' : ''} ✓`;
+    msg.textContent = `已清理 ${done} 个` +
+      (fail ? `，失败 ${fail} 个` : '') +
+      (blocked ? `，跳过 ${blocked} 个（刚被文章引用，已保留）` : '') + ' ✓';
     await loadMedia();
   }
 
@@ -2796,43 +2851,122 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // 记录文件归属（写 media 表）。失败不阻断上传——文件已传成功，仅少一条索引记录。
-  async function recordMedia({ path, bucket, originalName, mime, size }) {
+  async function recordMedia({ path, bucket, originalName, mime, size, sha256 }) {
     try {
-      await supabase.from('media').upsert({
+      const row = {
         path, bucket,
         post_slug: state.slug ? baseSlug(state.slug) : null,
         original_name: originalName || '', mime: mime || '', size_bytes: size || 0,
-      }, { onConflict: 'path' });
+      };
+      // sha256 列需先执行 supabase/media_dedup.sql；未执行时写入该列会报错，
+      // 故仅在拿到哈希时才带该字段，并在失败时回退为不带哈希的重试（保证记录不丢）。
+      if (sha256) row.sha256 = sha256;
+      const { error } = await supabase.from('media').upsert(row, { onConflict: 'path' });
+      if (error && sha256) {
+        // 多半是 media 表还没有 sha256 列（未执行 media_dedup.sql）：去掉该字段重试一次，
+        // 保证文件记录不丢，只是这一条不参与后续哈希去重。
+        delete row.sha256;
+        try { await supabase.from('media').upsert(row, { onConflict: 'path' }); } catch { /* 已尽力 */ }
+      }
     } catch (e) { console.warn('[admin] media 记录写入失败（不影响上传）', e); }
   }
 
+  // ---------- 内容去重（SHA-256） ----------
+  // 本会话已上传文件的哈希缓存：同一文件再次选中时直接复用，不再发任何请求。
+  // 这是「双语版本各插一次同一张图」的主场景，缓存能挡住绝大部分重复。
+  const uploadedByHash = new Map();   // `${bucket}:${sha256}` -> { bucket, path, publicUrl, isImg }
+
+  // 计算文件 SHA-256（hex）。非安全上下文（http 且非 localhost）或老浏览器无 crypto.subtle，
+  // 返回 null → 上层降级为「不去重、正常上传」，绝不阻断上传。
+  async function sha256File(file) {
+    try {
+      if (!(window.isSecureContext && window.crypto?.subtle)) return null;
+      const buf = await file.arrayBuffer();
+      const digest = await window.crypto.subtle.digest('SHA-256', buf);
+      return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch { return null; }
+  }
+
+  // 校验某个 storage 对象是否仍真实存在（media 有记录但文件被手工删掉时会失效）。
+  // 用 HEAD 探测公开 URL：404 视为不存在，网络异常则乐观认为存在（避免误判导致重复上传）。
+  async function objectExists(bucket, publicUrl) {
+    try {
+      const r = await fetch(publicUrl, { method: 'HEAD', cache: 'no-store' });
+      return r.ok;
+    } catch { return true; }
+  }
+
   // 上传单个文件到指定 bucket（默认按扩展名自动分流；附件面板可强制 attachments 桶）。
-  // 上传后登记 media 归属。返回 { bucket, isImg, path, publicUrl }。
+  // 上传前按内容哈希去重，命中则复用已有文件与 URL，不落新副本。返回 { bucket, isImg, path, publicUrl, reused }。
   async function uploadOne(file, forceBucket) {
     const bucket = forceBucket || bucketFor(file.name);
     const isImg = bucket === 'images';
+    const sha = await sha256File(file);
+    const key = sha ? `${bucket}:${sha}` : null;
+
+    // ① 本会话缓存命中：同一次编辑里重复选同一文件，直接复用，零请求
+    if (key && uploadedByHash.has(key)) {
+      return { ...uploadedByHash.get(key), reused: true, originalName: file.name };
+    }
+
+    // ② 库内已有同内容文件：复用其 URL，不重传（跨会话、跨文章、跨语言版本均生效）
+    if (sha) {
+      try {
+        const { data } = await supabase
+          .from('media')
+          .select('path, bucket, original_name, post_slug')
+          .eq('sha256', sha)
+          .eq('bucket', bucket)
+          .limit(1);
+        const hit = data && data[0];
+        if (hit) {
+          const publicUrl = supabase.storage.from(hit.bucket).getPublicUrl(hit.path).data.publicUrl;
+          // 记录存在但文件可能已被手工删除，探测确认后再复用
+          if (await objectExists(hit.bucket, publicUrl)) {
+            const r = { bucket: hit.bucket, isImg, path: hit.path, publicUrl, reused: true, originalName: file.name };
+            uploadedByHash.set(key, r);
+            // 附件复用：若原文件未归属任何文章（或属于别的文章），本次文章也应能在「附件」列表里看到它。
+            // media 表 path 是主键、一条文件只能归属一篇文章，故仅在「原本无归属」时补挂当前文章；
+            // 已归属别文则不动（避免把别人的附件抢过来），正文里的链接照常可用。
+            if (bucket === 'attachments' && !hit.post_slug && !state.slug) pendingAttach.add(hit.path);
+            return r;
+          }
+        }
+      } catch (e) { console.warn('[admin] 去重查询失败，按新文件上传', e); }
+    }
+
+    // ③ 未命中：正常上传
     const path = safeUploadPath(file.name, isImg, bucket === 'attachments');
     const { error } = await supabase.storage
       .from(bucket)
       .upload(path, file, { upsert: true, contentType: file.type || undefined });
     if (error) throw error;
     const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-    await recordMedia({ path, bucket, originalName: file.name, mime: file.type, size: file.size });
+    await recordMedia({ path, bucket, originalName: file.name, mime: file.type, size: file.size, sha256: sha || '' });
     if (!state.slug) pendingAttach.add(path); // 文章尚无 slug：保存成功后补关联
-    return { bucket, isImg, path, publicUrl };
+    const r = { bucket, isImg, path, publicUrl, reused: false, originalName: file.name };
+    if (key) uploadedByHash.set(key, r);
+    return r;
   }
 
-  // 「插入文件」：图片插入正文（Markdown 图片语法）；非图片不再塞进正文，
+  // 「插入本地图片」：图片插入正文（Markdown 图片语法）；非图片不塞进正文，
   // 而是作为附件登记（进入正文页底部「附件」区），避免正文被下载链接污染。
+  // 上传前按内容哈希去重：已上传过的图直接复用链接，不再落副本。
   async function uploadImages(files) {
     const msg = $('upload-msg');
     const imgs = [];
+    let reusedCount = 0, newCount = 0, attachCount = 0;
     for (const file of files) {
       msg.textContent = `上传中 ${file.name}…`;
       try {
         const r = await uploadOne(file);
-        if (r.isImg) imgs.push(`![](${r.publicUrl})`);
-        else msg.textContent = `「${file.name}」已作为附件（显示在文章底部，不插入正文）✓`;
+        if (r.reused) reusedCount++;
+        if (r.isImg) {
+          imgs.push(`![](${r.publicUrl})`);
+          if (!r.reused) newCount++;
+        } else {
+          attachCount++;
+        }
       } catch (e) {
         msg.textContent = '上传失败：' + e.message;
         return;
@@ -2840,28 +2974,233 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     }
     if (imgs.length) {
       insertAtCursor(imgs.join('\n'));
-      msg.textContent = `已插入 ${imgs.length} 张图片 ✓`;
+      const parts = [`已插入 ${imgs.length} 张图片`];
+      if (newCount) parts.push(`新上传 ${newCount}`);
+      if (reusedCount) parts.push(`${reusedCount} 张已存在、已复用原链接（未重复上传）`);
+      msg.textContent = parts.join('，') + ' ✓';
+    } else if (attachCount) {
+      msg.textContent = `已作为附件登记 ${attachCount} 个（显示在文章底部，不插入正文）✓`;
     }
     await refreshAttachList();
   }
 
   // 附件面板：上传到 attachments 桶（无论图片/文档），刷新列表。不触碰正文。
+  // 同样按内容哈希去重，重复上传的附件直接复用。
   async function uploadAttachment(files) {
     const msg = $('attach-msg');
+    let reusedCount = 0;
     for (const file of files) {
       msg.textContent = `上传中 ${file.name}…`;
       try {
-        await uploadOne(file, 'attachments');
+        const r = await uploadOne(file, 'attachments');
+        if (r.reused) reusedCount++;
       } catch (e) {
         msg.textContent = '上传失败：' + e.message;
         return;
       }
     }
-    msg.textContent = '已上传 ✓';
+    msg.textContent = reusedCount
+      ? `已完成 ✓（其中 ${reusedCount} 个此前已上传，已复用，未重复上传）`
+      : '已上传 ✓';
     await refreshAttachList();
   }
 
-  // 刷新附件列表（后台用登录态读 media，非公开视图）。
+  // ---------- 媒体选择器：从「已上传」资源中挑选并插入正文（不重传） ----------
+  // kind: 'images' → 插入 ![](url)；'attachments' → 插入 [文件名](url)
+  // 数据来源：allMedia（由 loadMedia 填充）。若尚未加载则先拉一次。
+  // 分组展示：① 本文已上传（post_slug = 当前 base slug）② 其他文章/未归属。
+  function openMediaPicker(kind) {
+    const isImage = kind === 'images';
+    const titleText = isImage ? '插入已上传图片' : '插入已上传附件';
+    const itemIcon = isImage ? '' : '📎';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'wb-picker';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', titleText);
+
+    const box = document.createElement('div');
+    box.className = 'wb-picker-box';
+
+    // 头部
+    const head = document.createElement('div');
+    head.className = 'wb-picker-head';
+    const headTitle = document.createElement('strong');
+    headTitle.textContent = titleText;
+    const headHint = document.createElement('span');
+    headHint.className = 'wb-hint';
+    headHint.textContent = '选中即为复用已有文件，不会重复上传';
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'wb-picker-x';
+    xBtn.setAttribute('aria-label', '关闭');
+    xBtn.textContent = '✕';
+    head.append(headTitle, headHint, xBtn);
+
+    // 搜索
+    const search = document.createElement('input');
+    search.className = 'wb-picker-search';
+    search.type = 'search';
+    search.placeholder = isImage ? '搜索图片文件名…' : '搜索附件文件名…';
+
+    // 列表容器
+    const listWrap = document.createElement('div');
+    listWrap.className = 'wb-picker-list';
+
+    // 底部（多选计数 + 插入按钮）
+    const foot = document.createElement('div');
+    foot.className = 'wb-picker-foot';
+    const footHint = document.createElement('span');
+    footHint.className = 'wb-hint';
+    const insertBtn = document.createElement('button');
+    insertBtn.type = 'button';
+    insertBtn.className = 'btn';
+    insertBtn.textContent = '插入';
+    insertBtn.disabled = true;
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn btn-ghost';
+    cancelBtn.textContent = '取消';
+    foot.append(footHint, cancelBtn, insertBtn);
+
+    box.append(head, search, listWrap, foot);
+    overlay.append(box);
+    document.body.appendChild(overlay);
+
+    const chosen = new Map();   // path -> media 行
+
+    const close = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+    };
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    }
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    xBtn.onclick = close;
+    cancelBtn.onclick = close;
+
+    function publicUrlOf(m) {
+      return supabase.storage.from(m.bucket).getPublicUrl(m.path).data.publicUrl;
+    }
+
+    function render() {
+      const q = search.value.trim().toLowerCase();
+      const curBase = state.slug ? baseSlug(state.slug) : null;
+      const pool = (allMedia || []).filter((m) => {
+        if (m.bucket !== kind) return false;
+        if (!q) return true;
+        return ((m.original_name || '') + ' ' + (m.path || '') + ' ' + (m.post_slug || ''))
+          .toLowerCase().includes(q);
+      });
+
+      const mine = curBase ? pool.filter((m) => m.post_slug === curBase) : [];
+      const others = curBase ? pool.filter((m) => m.post_slug !== curBase) : pool;
+
+      listWrap.innerHTML = '';
+      if (!pool.length) {
+        const empty = document.createElement('div');
+        empty.className = 'wb-picker-empty';
+        empty.textContent = q
+          ? '没有匹配的文件'
+          : (isImage ? '还没有已上传的图片，可先用「插入本地图片」上传' : '还没有已上传的附件，可先用「上传本地附件」上传');
+        listWrap.appendChild(empty);
+        return;
+      }
+
+      const buildGroup = (label, rows) => {
+        if (!rows.length) return;
+        const h = document.createElement('div');
+        h.className = 'wb-picker-group';
+        h.textContent = `${label}（${rows.length}）`;
+        listWrap.appendChild(h);
+        const grid = document.createElement('div');
+        grid.className = 'wb-picker-grid';
+        rows.forEach((m) => {
+          const url = publicUrlOf(m);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'wb-picker-item' + (chosen.has(m.path) ? ' is-on' : '');
+          btn.title = (m.original_name || m.path) + (m.post_slug ? `\n所属：${m.post_slug}` : '\n未归属文章');
+
+          const thumb = document.createElement('span');
+          thumb.className = 'wb-picker-thumb' + (isImage ? '' : ' is-file');
+          if (isImage) {
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = '';
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            img.onerror = () => { img.remove(); thumb.textContent = '⚠'; };
+            thumb.appendChild(img);
+          } else {
+            thumb.textContent = itemIcon;
+          }
+
+          const name = document.createElement('span');
+          name.className = 'wb-picker-name';
+          name.textContent = m.original_name || m.path;
+
+          btn.append(thumb, name);
+          btn.onclick = () => {
+            if (chosen.has(m.path)) chosen.delete(m.path);
+            else chosen.set(m.path, m);
+            btn.classList.toggle('is-on', chosen.has(m.path));
+            syncFoot();
+          };
+          grid.appendChild(btn);
+        });
+        listWrap.appendChild(grid);
+      };
+
+      if (curBase) {
+        buildGroup('本文已上传', mine);
+        buildGroup('其他文件', others);
+      } else {
+        buildGroup('全部文件', others);
+      }
+    }
+
+    function syncFoot() {
+      const n = chosen.size;
+      footHint.textContent = n ? `已选 ${n} 项` : '点击选择，可多选';
+      insertBtn.disabled = n === 0;
+      insertBtn.textContent = n > 1 ? `插入 ${n} 项` : '插入';
+    }
+
+    insertBtn.onclick = () => {
+      const rows = [...chosen.values()];
+      if (!rows.length) return;
+      const lines = rows.map((m) => {
+        const url = publicUrlOf(m);
+        if (isImage) return `![](${url})`;
+        // 附件：用文件名作链接文字（Markdown 链接语法），并把方括号转义，避免破坏语法
+        const label = String(m.original_name || m.path).replace(/([\[\]])/g, '\\$1');
+        return `[${label}](${url})`;
+      });
+      insertAtCursor(lines.join('\n'));
+      const target = isImage ? $('upload-msg') : $('attach-msg');
+      if (target) target.textContent = `已插入 ${rows.length} 项（复用已有文件，未重新上传）✓`;
+      close();
+    };
+
+    search.addEventListener('input', render);
+    syncFoot();
+
+    // 若媒体库未加载过，先拉一次再渲染
+    if (!allMedia || !allMedia.length) {
+      listWrap.innerHTML = '<div class="wb-picker-empty">加载中…</div>';
+      loadMedia().then(render).catch(() => {
+        listWrap.innerHTML = '<div class="wb-picker-empty">读取媒体库失败，请先打开「文件管理」刷新</div>';
+      });
+    } else {
+      render();
+    }
+    search.focus();
+  }
+
   async function refreshAttachList() {
     const ul = $('attach-list');
     if (!ul) return;
@@ -2890,11 +3229,21 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     }
   }
 
-  // 删除单个附件：清 storage 对象 + media 记录，再刷新列表。
+  // 删除单个附件：先做引用检查（正文可能已用「插入已上传附件」引入链接），
+  // 仍被引用则阻止；确认后清 storage 对象 + media 记录，刷新列表。
   async function removeAttachment(path) {
+    const refs = await findReferences(path);
+    if (refs.length) {
+      alert(
+        `无法删除：该附件仍被 ${refs.length} 篇文章引用。\n\n` +
+        refsToText(refs) + `\n\n` +
+        `请先在对应文章中移除对该附件的链接，再回来删除。`
+      );
+      return;
+    }
     if (!confirm('删除该附件？此操作不可恢复。')) return;
-    await supabase.storage.from('attachments').remove([path]).catch(() => {});
-    await supabase.from('media').delete().eq('path', path).catch(() => {});
+    try { await supabase.storage.from('attachments').remove([path]); } catch { /* 文件可能已不存在 */ }
+    try { await supabase.from('media').delete().eq('path', path); } catch { /* 记录可能已不存在 */ }
     await refreshAttachList();
   }
 
@@ -3141,6 +3490,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       if (e.target.files?.length) uploadAttachment([...e.target.files]);
       e.target.value = '';
     });
+
+    // 插入已上传资源：打开媒体选择器（不重新上传）
+    $('pick-image-btn')?.addEventListener('click', () => openMediaPicker('images'));
+    $('pick-attach-btn')?.addEventListener('click', () => openMediaPicker('attachments'));
 
     // ---------- 粘贴：图片直接上传插入；网页复制的图片转 Markdown ----------
     // 纯文本粘贴走浏览器默认行为（已验证可用），这里只补齐图片场景
