@@ -303,9 +303,12 @@ export async function getAvatar(opts = {}) {
   return url;
 }
 
-// 资料卡头像加载失败时的兜底字（与源码配置一致）
-export function avatarFallbackChar() {
-  return (site.avatarFallback || (site.author || 'A').slice(0, 1) || 'A');
+// 资料卡头像加载失败时的兜底字（与源码配置一致；avatarFallback 为 { zh, en }，默认取中文首字）
+export function avatarFallbackChar(lang = 'zh') {
+  const fb = site.avatarFallback;
+  const ch = fb && typeof fb === 'object' ? fb[lang] || fb.zh : fb;
+  const name = site.author && typeof site.author === 'object' ? site.author[lang] || site.author.zh : site.author;
+  return ch || (name || 'A').slice(0, 1) || 'A';
 }
 export { site as siteConfig };
 

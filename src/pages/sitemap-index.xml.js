@@ -5,8 +5,8 @@ const LANGS = ['zh', 'en'];
 // 每种语言的静态页（zh 用无前缀根路径）
 const staticPaths = ['/', '/about/', '/categories/', '/archive/', '/search/'];
 
-// 文章 URL 前缀：zh 无前缀，en 带语言段
-const prefix = (lang, path) => (lang === 'zh' ? path : `/${lang}${path}`);
+// 文章 URL 前缀：en 无前缀（默认语言，驻留根路径），zh 带 /zh 段
+const prefix = (lang, path) => (lang === 'en' ? path : `/${lang}${path}`);
 
 export async function GET(context) {
   const base = context.site || new URL('https://hxlss.cn');

@@ -338,7 +338,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
               <p class="wb-hint wb-cat-note">编辑「关于」页文字，保存后刷新前台即时生效，不走代码发布。正文支持 <strong>**粗体**</strong>、<strong>[文字](网址)</strong>、<strong>## 小标题</strong>，空行分段；引导语为纯文本单行。全部留空则回退源码内置的默认文案。</p>
               <label class="wb-field">中文 — 引导语<input id="about-lead-zh" placeholder="如：你好，我是老一贯。" /></label>
               <label class="wb-field">中文 — 正文<textarea id="about-body-zh" rows="10" placeholder="## 小标题&#10;&#10;正文段落…"></textarea></label>
-              <label class="wb-field">English — Lead<input id="about-lead-en" placeholder="Hi, I'm 老一贯." /></label>
+              <label class="wb-field">English — Lead<input id="about-lead-en" placeholder="Hi, I'm Lao Yiguan." /></label>
               <label class="wb-field">English — Body<textarea id="about-body-en" rows="10" placeholder="## Heading&#10;&#10;Paragraph…"></textarea></label>
               <div class="wb-about-acts">
                 <button id="about-save" class="btn" type="button">保存文案</button>
@@ -357,7 +357,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   import { createClient } from '@supabase/supabase-js';
   import { marked } from 'marked';
   import { localExcerpt } from '../lib/excerpt.js';
-  import { site } from '../data/site.js';
+  import { site, pickI18n } from '../data/site.js';
 
   // 注意：不要命名成 URL，会遮蔽全局的 URL 构造器（createObjectURL/revokeObjectURL）
   const SUPABASE_URL = import.meta.env.PUBLIC_SUPABASE_URL;
@@ -1354,7 +1354,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   async function replyTo(parent, content) {
     const { error } = await supabase.from('comments').insert({
       page: parent.page,
-      author: (site && site.author) || '老一贯',
+      author: (site && pickI18n(site.author, 'zh')) || '老一贯',
       email: '',
       content: content.slice(0, 1000),
       approved: true,
@@ -1912,7 +1912,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('f-cover').value = p.cover || '';
     $('f-published-at').value = toLocalInput(p.published_at);
     $('published-at-hint').textContent = '修改已发布文章的展示与排序时间；留空则保持原时间';
-    $('f-author').value = (p.author || site.author || '').trim();
+    $('f-author').value = (p.author || pickI18n(site.author, 'zh') || '').trim();
     $('f-content').value = p.content || '';
     // 访问加密回显：开关与提示语可回显；密码永不回显（DB 端哈希，取了也看不出原文），
     // 留空即「不修改原密码」。wasEncrypted/passHint 记录保存前的状态，供 persist 判增量。
@@ -1990,7 +1990,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       category_slug,
       excerpt: $('f-excerpt').value.trim(),
       cover: $('f-cover').value.trim(),
-      author: $('f-author').value.trim() || (site.author || ''),
+      author: $('f-author').value.trim() || (pickI18n(site.author, 'zh') || ''),
       content: $('f-content').value,
       published: state.status === 'published',
       // 发布时间：填写了新时间则随保存写入（ISO/UTC）；留空时不带该键，数据库列保持原值
@@ -2469,7 +2469,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
            ${rep.is_encrypted ? '<span class="wb-badge is-enc" title="访问加密：前台需输入密码解锁；不进列表/搜索/sitemap">🔒 加密</span>' : ''}
            <span class="wb-date">${d}</span>
            <span class="wb-item-langs">${langTags}</span>
-           <span class="wb-author">${escapeHtml(rep.author || site.author || '')}</span>
+           <span class="wb-author">${escapeHtml(rep.author || pickI18n(site.author, 'zh') || '')}</span>
          </span>`;
 
       main.querySelectorAll('.wb-item-lang').forEach((b) => {

@@ -4,8 +4,8 @@
 // 站点固定术语表：站名、作者、栏目等专有名词的译法，保证全站译文一致。
 // 可用环境变量 TRANSLATE_GLOSSARY_JSON 覆盖/扩展（JSON 对象，键为原文）。
 const DEFAULT_GLOSSARY = {
-  '吾道一以贯之': { en: 'One Thread Through It All' },
-  '老一贯': { en: 'Old Yiguan' },
+  '吾道一以贯之': { en: 'The Way, One Thread' },
+  '老一贯': { en: 'Lao Yiguan' },
   '跑步': { en: 'running' },
 };
 

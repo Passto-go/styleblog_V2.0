@@ -1,6 +1,6 @@
 ---
 import Icon from './Icon.astro';
-import { site } from '../data/site.js';
+import { site, pickI18n } from '../data/site.js';
 import { getAvatar } from '../lib/posts.js';
 import { useTranslations, localizePath } from '../i18n/ui.js';
 
@@ -8,6 +8,10 @@ const { lang = 'zh', postsCount = 0, catsCount = 0, avatar = null } = Astro.prop
 const t = useTranslations(lang);
 const L = (p) => localizePath(p, lang);
 const socials = site.socials.filter((s) => s.url);
+// 姓名 / 简介 / 头像占位字按当前语言取值（zh、en 结构对齐，缺失回退中文）
+const authorName = pickI18n(site.author, lang);
+const tagline = pickI18n(site.tagline, lang);
+const avatarFallback = pickI18n(site.avatarFallback, lang);
 const stats = [
   { num: postsCount, lbl: t('profile.posts'), href: L('/archive/') },
   { num: catsCount, lbl: t('profile.categories'), href: L('/categories/') },
@@ -18,11 +22,11 @@ const avatarSrc = avatar !== null ? avatar : await getAvatar();
 ---
 <aside class="profile-card">
   <div class="profile-avatar">
-    <span class="avatar-fallback">{site.avatarFallback}</span>
-    {avatarSrc && <img src={avatarSrc} alt={site.author} onerror="this.remove()" />}
+    <span class="avatar-fallback">{avatarFallback}</span>
+    {avatarSrc && <img src={avatarSrc} alt={authorName} onerror="this.remove()" />}
   </div>
-  <h3 class="profile-name">{site.author}</h3>
-  <p class="profile-tagline">{site.tagline}</p>
+  <h3 class="profile-name">{authorName}</h3>
+  <p class="profile-tagline">{tagline}</p>
   <div class="profile-stats">
     {stats.map((s) => (
       <a class="profile-stat" href={s.href}>

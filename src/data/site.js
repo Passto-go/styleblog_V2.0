@@ -1,15 +1,28 @@
 // 站点全局配置：改这里即可换站名、作者、版权、外链、资料卡、今日寄语、倒计时
+// 站名 / 姓名 / 简介按语言组织（zh、en 结构完全对齐），资料卡与页头按当前语言取值。
 export const site = {
-  name: '吾道一以贯之',
-  author: '老一贯',
+  name: {
+    zh: '吾道一以贯之',
+    en: 'The Way, One Thread',
+  },
+  author: {
+    zh: '老一贯',
+    en: 'Lao Yiguan',
+  },
   // 版权起始年份（页脚显示为「起始年–今年」）；若想只显示单年，把 startYear 设为空字符串
   startYear: '',
 
   // 头像：把图片放到 public/avatar.png 即可自动启用；留空则用 avatarFallback 首字占位
   avatar: '/avatar.png',
-  avatarFallback: '贯',
-  // 资料卡一句话简介
-  tagline: '记录跑步、生活，以及一些零散的观察和想法。',
+  avatarFallback: {
+    zh: '贯',
+    en: 'L',
+  },
+  // 资料卡一句话简介（姓名下方的说明文字）
+  tagline: {
+    zh: '记录一个普通人视角下的世界。',
+    en: "A record of the world through an ordinary person's eyes.",
+  },
 
   license: { name: 'CC BY-NC 4.0', url: 'https://creativecommons.org/licenses/by-nc/4.0/' },
   // Powered by 为数组：本博客是 Astro 生成的静态站，文章数据存于 Supabase
@@ -76,4 +89,11 @@ export function copyrightText() {
   const year = new Date().getFullYear();
   const range = site.startYear ? `${site.startYear}–${year}` : `${year}`;
   return { year: range };
+}
+
+// 按语言取站名 / 姓名 / 简介 / 头像占位字（zh、en 未收录时回退中文）。
+// 站名、姓名、简介在 site 里是 { zh, en } 对象，统一走这个取值器，避免各处手写兜底。
+export function pickI18n(field, lang = 'en') {
+  if (field && typeof field === 'object') return field[lang] || field.zh || field.en || '';
+  return field || '';
 }

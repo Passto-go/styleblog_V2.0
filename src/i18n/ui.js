@@ -1,5 +1,7 @@
 // 双语（zh / en）文案与路由辅助
-export const defaultLang = 'zh';
+// 默认语言 = 英文（无前缀驻留根路径，如 /about）；中文迁入 /zh/（如 /zh/about）。
+// 见 src/pages 目录结构：根 = 英文，zh/ = 中文。
+export const defaultLang = 'en';
 
 // switchLabel = 在“另一种语言”的页面里，这个链接显示的文案（即“切过去”的目标语言）
 export const languages = {
@@ -10,7 +12,7 @@ export const languages = {
 export const ui = {
   zh: {
     'site.name': '吾道一以贯之',
-    'site.tagline': '记录跑步、生活，以及一些零散的观察和想法。',
+    'site.tagline': '记录一个普通人视角下的世界。',
     'site.description': '一个普通人的个人博客，记录生活随笔、跑步与日常观察。',
 
     'nav.home': '主页',
@@ -143,8 +145,8 @@ export const ui = {
     '404.back': '返回首页',
   },
   en: {
-    'site.name': '吾道一以贯之',
-    'site.tagline': 'Notes on running, life, and scattered thoughts.',
+    'site.name': 'The Way, One Thread',
+    'site.tagline': "A record of the world through an ordinary person's eyes.",
     'site.description': 'A personal blog about everyday life, running, and quiet observations.',
 
     'nav.home': 'Home',
@@ -266,7 +268,7 @@ export const ui = {
     'article.showingZh': 'You are reading the Chinese original.',
     'article.showingEn': 'You are reading the English version.',
 
-    'footer.copyright': 'Copyright © {year} 老一贯',
+    'footer.copyright': 'Copyright © {year} Lao Yiguan',
     'footer.license': 'Licensed under CC BY-NC 4.0',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
@@ -280,12 +282,14 @@ export const ui = {
 
 export function getLangFromUrl(url) {
   const seg = url.pathname.split('/').filter(Boolean)[0];
-  return seg === 'en' ? seg : defaultLang;
+  // 仅 zh / en 为合法语言前缀；其余（含空段，即根路径）一律回退默认语言（en）
+  return seg === 'zh' || seg === 'en' ? seg : defaultLang;
 }
 
 export function useTranslations(lang) {
   const dict = ui[lang] || ui[defaultLang];
-  const fallback = ui[defaultLang];
+  // 次级回退到中文：缺失英文串时回落中文（落实「无英文内容→中文」），而非回退默认语言自身
+  const fallback = ui['zh'];
   return function t(key, vars) {
     let str = dict[key] ?? fallback[key] ?? key;
     if (vars) {
