@@ -1,0 +1,17 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 每天 UTC 0 点执行，即北京时间每天早 8 点
+  workflow_dispatch:       # 允许在 Actions 页面手动点 "Run workflow" 立即测试
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/?apikey=${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "HTTP status: $CODE"
+          [ "$CODE" = "200" ] || exit 1
