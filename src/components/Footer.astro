@@ -17,6 +17,7 @@ const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
         ))}
       </p>
       <p>Hosted by <a href={site.hostedBy.url} target="_blank" rel="noopener">{site.hostedBy.name}</a></p>
+      <p><a href={localizePath('/copyright', lang)}>{t('footer.license')}</a></p>
     </div>
     <div class="footer-clock">
       <span class="footer-clock-label">{t('footer.clock')}</span>
@@ -27,26 +28,8 @@ const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
       </span>
     </div>
   </div>
-  <div class="wrap footer-license">
-    <p><a href={localizePath('/copyright', lang)}>{t('footer.license')}</a></p>
-  </div>
 </footer>
 
-<style>
-  .footer-license {
-    margin-top: 1.125rem;
-    padding-top: 0.875rem;
-    border-top: 1px solid var(--border, rgba(128, 128, 128, 0.22));
-    text-align: center;
-  }
-  .footer-license p {
-    margin: 0;
-    font-size: 0.8125rem;
-    opacity: 0.72;
-  }
-  .footer-license a { text-decoration: none; }
-  .footer-license a:hover { text-decoration: underline; }
-</style>
 
 <script define:vars={{ lang }}>
   (function () {
