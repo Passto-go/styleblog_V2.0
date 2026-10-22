@@ -1,5 +1,5 @@
 ---
-import { useTranslations } from '../i18n/ui.js';
+import { useTranslations, localizePath } from '../i18n/ui.js';
 import { site } from '../data/site.js';
 
 const { lang } = Astro.props;
@@ -11,7 +11,7 @@ const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
   <div class="wrap footer-inner">
     <div class="footer-meta">
       <p>{t('footer.copyright', { year: yearLabel })}</p>
-      <p>Licensed under <a href={site.license.url} target="_blank" rel="noopener">{site.license.name}</a></p>
+      <p><a href={localizePath('/copyright', lang)}>{t('footer.license')}</a></p>
       <p>Powered by
         {site.poweredBy.map((p, i) => (
           <span>{i > 0 && ' & '}<a href={p.url} target="_blank" rel="noopener">{p.name}</a></span>

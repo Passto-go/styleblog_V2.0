@@ -1,0 +1,48 @@
+---
+// 页面溯源水印：全站前端页面叠加一层半透明、平铺重复的标识，
+// 截图外泄时可按「访客 IP · 日期 · 品牌名」反向溯源。
+// 标识来源：服务端取 CF-Connecting-IP（匿名访客即可溯源，无需登录态）；
+// 叠加动态日期与品牌名（吾道一以贯之 / The Way, One Thread，零域名）。
+import { site, pickI18n } from '../data/site.js';
+
+const { lang = 'zh' } = Astro.props;
+const ip = Astro.request?.headers?.get?.('cf-connecting-ip') || '';
+const who = ip || 'guest';
+const date = new Date().toISOString().slice(0, 10);
+const brand = pickI18n(site.name, lang);
+const mark = `${who} · ${date} · ${brand}`;
+---
+<div id="wm" class="site-watermark" aria-hidden="true" data-mark={mark}></div>
+
+<script is:inline>
+  (function () {
+    var el = document.getElementById('wm');
+    if (!el) return;
+    var text = el.getAttribute('data-mark') || '';
+    if (!text) return;
+    var c = document.createElement('canvas');
+    var ctx = c.getContext('2d');
+    c.width = 260;
+    c.height = 150;
+    ctx.font = '13px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = 'rgba(128,128,128,0.10)'; // 浅灰、低透明，几乎无感
+    ctx.translate(30, 78);
+    ctx.rotate(-Math.PI / 6);                 // 斜向 -30°
+    ctx.fillText(text, 0, 0);
+    el.style.backgroundImage = 'url(' + c.toDataURL() + ')';
+  })();
+</script>
+
+<style>
+  .site-watermark {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: none;       /* 不拦截任何点击 / 选中 */
+    background-repeat: repeat;
+  }
+  /* 深色主题下把灰字提亮，保持可见但不刺眼 */
+  :global([data-theme='dark']) .site-watermark {
+    filter: invert(1) opacity(0.45);
+  }
+</style>

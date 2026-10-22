@@ -24,7 +24,8 @@ export const site = {
     en: "A record of the world through an ordinary person's eyes.",
   },
 
-  license: { name: 'CC BY-NC 4.0', url: 'https://creativecommons.org/licenses/by-nc/4.0/' },
+  // 版权许可：B 方案（自定义，非 CC）。页脚改指 /copyright 页，文案见该页与 footer.license。
+  license: { name: '转载请注明出处，禁止整篇转载与商用', url: '/copyright' },
   // Powered by 为数组：本博客是 Astro 生成的静态站，文章数据存于 Supabase
   poweredBy: [
     { name: 'Astro', url: 'https://astro.build' },

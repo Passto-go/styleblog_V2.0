@@ -1,0 +1,63 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const { lang } = Astro.props;
+const year = new Date().getFullYear();
+
+// B 方案版权说明：自定义、非 CC、零域名。
+// 署名用作者身份（老一贯 / Lao Yiguan）与品牌名（吾道一以贯之 / The Way, One Thread），
+// 不出现站点域名；年份动态生成；出链一律走相对路径 /copyright，跟随域名变化。
+const CONTENT = {
+  zh: {
+    title: '版权与转载说明',
+    lead: '本站内容的著作权归属与转载规则。',
+    blocks: [
+      { tag: 'p', html: '本站（吾道一以贯之）全部原创文章、图片与代码的著作权归 <strong>老一贯</strong> 所有。' },
+      { tag: 'h2', text: '欢迎的做法' },
+      { tag: 'p', html: '非商业用途的引用与分享：引用片段请注明作者与原文链接；分享至社交平台请保留出处。' },
+      { tag: 'h2', text: '未经许可，禁止' },
+      { tag: 'p', html: '1. 整篇或实质性转载（含镜像、聚合、转码后发布）；' },
+      { tag: 'p', html: '2. 任何形式的商业化使用（付费墙、广告变现、二次出售）；' },
+      { tag: 'p', html: '3. 去除署名或篡改内容后重新发布。' },
+      { tag: 'h2', text: '关于 AI 与数据挖掘' },
+      { tag: 'p', html: '未经授权，请勿将本站内容用于模型训练、数据挖掘或类似自动化抓取。' },
+      { tag: 'h2', text: '侵权举报' },
+      { tag: 'p', html: '如发现未经授权的转载或滥用，请通过 <a href="mailto:intl1024@outlook.com">intl1024@outlook.com</a> 联系站长，并附上侵权页面链接，我们将在核实后处理。' },
+      { tag: 'p', html: `© ${year} 老一贯（吾道一以贯之）。保留署名权。` },
+    ],
+  },
+  en: {
+    title: 'Copyright & Republishing',
+    lead: 'How the content on this site is licensed and may be shared.',
+    blocks: [
+      { tag: 'p', html: 'All original articles, images, and code on this site (The Way, One Thread) are the intellectual property of <strong>Lao Yiguan</strong>.' },
+      { tag: 'h2', text: 'What you may do' },
+      { tag: 'p', html: 'Quote short excerpts for non-commercial purposes, with clear attribution and a link to the original; sharing on social platforms is welcome with credit kept intact.' },
+      { tag: 'h2', text: 'Without permission, you may not' },
+      { tag: 'p', html: '1. Repost entire posts or substantial portions (including mirroring, aggregation, or republishing after transcoding);' },
+      { tag: 'p', html: '2. Use the content commercially in any form (paywalls, ad monetization, resale);' },
+      { tag: 'p', html: '3. Strip attribution or alter and redistribute the content.' },
+      { tag: 'h2', text: 'AI & data mining' },
+      { tag: 'p', html: 'Automated scraping or training of models on this content is not permitted without authorization.' },
+      { tag: 'h2', text: 'Report infringement' },
+      { tag: 'p', html: 'To report unauthorized use, contact the site owner at <a href="mailto:intl1024@outlook.com">intl1024@outlook.com</a> with a link to the infringing page. We will act upon verification.' },
+      { tag: 'p', html: `© ${year} Lao Yiguan (The Way, One Thread). Attribution rights reserved.` },
+    ],
+  },
+};
+
+const c = CONTENT[lang] || CONTENT.en;
+---
+<Base lang={lang} title={c.title} description={c.lead}>
+  <section class="page">
+    <h1 class="page-title">{c.title}</h1>
+    <p class="lead">{c.lead}</p>
+    <div class="prose">
+      {c.blocks.map((b) =>
+        b.tag === 'h2'
+          ? <h2>{b.text}</h2>
+          : <p set:html={b.html} />
+      )}
+    </div>
+  </section>
+</Base>

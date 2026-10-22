@@ -269,6 +269,6 @@ PUBLIC_SITE_URL=
 
 ## 十三、许可证
 
-本项目内容采用 **CC BY-NC 4.0**（署名-非商业性使用）许可。
+本项目内容采用**自定义转载规则（非 CC 协议）**：允许非商业引用并注明出处，禁止整篇转载、商业化使用及去除署名。完整条款见线上 `/copyright`（及 `/zh/copyright`）。
 
 > 由 **Astro + Supabase + Cloudflare** 构建。

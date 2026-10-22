@@ -135,7 +135,7 @@ export const ui = {
     'article.showingEn': '当前展示的是英文版。',
 
     'footer.copyright': 'Copyright © {year} 老一贯',
-    'footer.license': 'Licensed under CC BY-NC 4.0',
+    'footer.license': '转载请注明出处，禁止整篇转载与商用',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
     'footer.clock': '北京时间 · UTC+8',
@@ -269,7 +269,7 @@ export const ui = {
     'article.showingEn': 'You are reading the English version.',
 
     'footer.copyright': 'Copyright © {year} Lao Yiguan',
-    'footer.license': 'Licensed under CC BY-NC 4.0',
+    'footer.license': 'Quote with attribution; no full repost or commercial use',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
     'footer.clock': 'Beijing time · UTC+8',
