@@ -9,18 +9,21 @@ const staticPaths = ['/', '/about/', '/categories/', '/archive/', '/search/'];
 const prefix = (lang, path) => (lang === 'en' ? path : `/${lang}${path}`);
 
 export async function GET(context) {
-  const base = context.site || new URL('https://hxlss.cn');
+  // 域名唯一来源：Astro.site（由 PUBLIC_SITE_URL 构建变量注入）。
+  // 不再写死域名兜底——换域名只需改环境变量，此处零改动。
+  // 本地未配置时，Astro.site 为空，加载的是 localhost 兜底地址（不影响线上）。
+  const base = context.site ?? new URL('http://localhost:4321');
 
   const urls = [];
 
-  // ① 三语静态页
+  // ① 各语言静态页
   for (const lang of LANGS) {
     for (const p of staticPaths) {
       urls.push({ loc: prefix(lang, p), lastmod: null, priority: '0.7' });
     }
   }
 
-  // ② 三语分类详情页（从文章分类 + 后台注册表汇总，含 0 篇的分类）
+  // ② 各语言分类详情页（从文章分类 + 后台注册表汇总，含 0 篇的分类）
   const catSlugs = await getAllCategorySlugs();
   for (const lang of LANGS) {
     for (const slug of catSlugs) {
@@ -28,7 +31,7 @@ export async function GET(context) {
     }
   }
 
-  // ③ 全部语言版本的文章（不再按语言挑选，ja 版必须进 sitemap）
+  // ③ 全部语言版本的文章（不按语言挑拣，中英双语都进 sitemap）
   const posts = await getAllPostsEveryLang();
   for (const p of posts) {
     const lang = p.lang || 'zh';
