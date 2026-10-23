@@ -2,7 +2,13 @@
 // 页面溯源水印：全站前端页面叠加一层半透明、平铺重复的标识，
 // 截图外泄时可按「访客 IP · 日期 · 品牌名」反向溯源。
 // 标识来源：服务端取 CF-Connecting-IP（匿名访客即可溯源，无需登录态）；
-// 叠加动态日期与品牌名（吾道一以贯之 / The Way, One Thread，零域名）。
+// 叠加访问者当地日期与品牌名（吾道一以贯之 / The Way, One Thread，零域名）。
+//
+// 日期口径（三层降级，优先级从高到低）：
+//   ① 浏览器时区 —— 客户端读 Intl.DateTimeFormat().resolvedOptions().timeZone，精确到设备，免费；
+//   ② IP 国家   —— 服务端 CF-IPCountry 映射该国代表时区，用于 JS 禁用等场景兜底；
+//   ③ 北京时间  —— 两者都不可得时的最终兜底（保持原有行为）。
+// 服务端先按 ② 算出初始日期，保证即便禁用 JS 也不会留空；客户端能拿到时区时再替换为 ①。
 import { site, pickI18n } from '../data/site.js';
 
 const { lang = 'zh' } = Astro.props;
@@ -18,13 +24,40 @@ function shortenIp(ip) {
 }
 const who = shortenIp(rawIp);
 
-// 日期固定按北京时间（UTC+8）生成，避免凌晨 0–8 点显示成前一天的 UTC 日期。
-const date = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-}).format(new Date());
+// IP 国家 → 代表时区。仅用于「拿不到浏览器时区」时的兜底，
+// 跨多时区的大国（美/俄/澳/加/巴西）只能取一个国家代表时区，会存在偏差。
+const COUNTRY_TZ = {
+  CN: 'Asia/Shanghai', HK: 'Asia/Hong_Kong', MO: 'Asia/Macau', TW: 'Asia/Taipei',
+  JP: 'Asia/Tokyo', KR: 'Asia/Seoul', SG: 'Asia/Singapore', MY: 'Asia/Kuala_Lumpur',
+  TH: 'Asia/Bangkok', VN: 'Asia/Ho_Chi_Minh', ID: 'Asia/Jakarta', PH: 'Asia/Manila',
+  IN: 'Asia/Kolkata', PK: 'Asia/Karachi', BD: 'Asia/Dhaka', NP: 'Asia/Kathmandu',
+  AE: 'Asia/Dubai', SA: 'Asia/Riyadh', IL: 'Asia/Jerusalem', TR: 'Europe/Istanbul',
+  GB: 'Europe/London', IE: 'Europe/Dublin', FR: 'Europe/Paris', DE: 'Europe/Berlin',
+  NL: 'Europe/Amsterdam', ES: 'Europe/Madrid', IT: 'Europe/Rome', CH: 'Europe/Zurich',
+  SE: 'Europe/Stockholm', NO: 'Europe/Oslo', PL: 'Europe/Warsaw', RU: 'Europe/Moscow',
+  UA: 'Europe/Kyiv', US: 'America/New_York', CA: 'America/Toronto', MX: 'America/Mexico_City',
+  BR: 'America/Sao_Paulo', AR: 'America/Argentina/Buenos_Aires', CL: 'America/Santiago',
+  AU: 'Australia/Sydney', NZ: 'Pacific/Auckland', ZA: 'Africa/Johannesburg',
+  EG: 'Africa/Cairo', NG: 'Africa/Lagos', KE: 'Africa/Nairobi',
+};
+
+function formatDateIn(tz) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+  } catch {
+    // 时区名非法时退回北京时间
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+  }
+}
+
+const country = (Astro.request?.headers?.get?.('cf-ipcountry') || '').toUpperCase();
+// ② IP 国家兜底；③ 无国家信息时用北京时间
+const serverTz = COUNTRY_TZ[country] || 'Asia/Shanghai';
+const date = formatDateIn(serverTz);
 
 const brand = pickI18n(site.name, lang);
 const mark = `${who} · ${date} · ${brand}`;
@@ -35,9 +68,36 @@ const mark = `${who} · ${date} · ${brand}`;
   (function () {
     var el = document.getElementById('wm');
     if (!el) return;
-    var text = el.getAttribute('data-mark') || '';
-    if (!text) return;
 
+    // ① 浏览器时区优先：精确到访问设备，不受代理/VPN 出口影响。
+    // 拿到后重算日期，替换服务端（IP 国家）算出的日期部分，再绘制。
+    function localDate() {
+      try {
+        var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!tz) return '';
+        return new Intl.DateTimeFormat('en-CA', {
+          timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+        }).format(new Date());
+      } catch (e) {
+        return '';
+      }
+    }
+
+    var mark = el.getAttribute('data-mark') || '';
+    if (!mark) return;
+
+    // mark 形如 "IP · YYYY-MM-DD · 品牌名"，中间那段是日期
+    var parts = mark.split(' · ');
+    if (parts.length >= 3) {
+      var d = localDate();
+      if (d && d !== parts[1]) {
+        parts[1] = d;
+        mark = parts.join(' · ');
+        el.setAttribute('data-mark', mark);
+      }
+    }
+
+    var text = mark;
     var FONT = '13px system-ui, -apple-system, "Segoe UI", sans-serif';
     var ANGLE = -Math.PI / 6;   // 斜向 -30°
     var PADDING = 24;           // 单个水印块四周留白，避免文字被裁
@@ -50,7 +110,6 @@ const mark = `${who} · ${date} · ${brand}`;
 
     var cos = Math.abs(Math.cos(ANGLE));
     var sin = Math.abs(Math.sin(ANGLE));
-    // 旋转后的水平/垂直投影尺寸
     var boxW = textW * cos + 14 * sin;
     var boxH = textW * sin + 14 * cos;
 
