@@ -17,8 +17,11 @@ const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
         ))}
       </p>
       <p>Hosted by <a href={site.hostedBy.url} target="_blank" rel="noopener">{site.hostedBy.name}</a></p>
-      <p><a href={localizePath('/copyright', lang)}>{t('footer.license')}</a></p>
-      <p><a href={localizePath('/privacy', lang)}>{t('footer.privacy')}</a></p>
+      <p>
+        <a href={localizePath('/copyright', lang)}>{t('footer.license')}</a>
+        <span class="footer-sep"> · </span>
+        <a href={localizePath('/privacy', lang)}>{t('footer.privacy')}</a>
+      </p>
     </div>
     <div class="footer-clock">
       <span class="footer-clock-label">{t('footer.clock')}</span>

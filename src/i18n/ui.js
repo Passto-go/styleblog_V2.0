@@ -135,7 +135,7 @@ export const ui = {
     'article.showingEn': '当前展示的是英文版。',
 
     'footer.copyright': 'Copyright © {year} 老一贯',
-    'footer.license': '转载请注明出处，禁止整篇转载与商用',
+    'footer.license': '许可声明',
     'footer.privacy': '隐私说明',
     'consent.text': '本站使用 Google Analytics 了解网站流量、访客互动与回访情况。这会在你的浏览器中写入 Cookie。',
     'consent.more': '隐私说明',
@@ -274,10 +274,10 @@ export const ui = {
     'article.showingEn': 'You are reading the English version.',
 
     'footer.copyright': 'Copyright © {year} Lao Yiguan',
-    'footer.license': 'Quote with attribution; no full repost or commercial use',
-    'footer.privacy': 'Privacy notice',
+    'footer.license': 'Terms of Use',
+    'footer.privacy': 'Privacy Policy',
     'consent.text': 'This site uses Google Analytics to understand traffic, visitor engagement and return visits. This sets cookies in your browser.',
-    'consent.more': 'Privacy notice',
+    'consent.more': 'Privacy Policy',
     'consent.accept': 'Accept',
     'consent.reject': 'Decline',
     'footer.powered': 'Powered by Astro',
