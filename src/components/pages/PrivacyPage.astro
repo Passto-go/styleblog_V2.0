@@ -24,8 +24,8 @@ const TOC = [
 const title = lang === 'zh' ? '隐私说明' : 'Privacy Policy';
 const leadZh = '本站（吾道一以贯之）是一个个人博客。本隐私说明阐述本站如何处理访客的个人信息，包括我们收集哪些信息、用于何种目的、是否会与第三方共享、保存期限，以及你对本站所持有信息的权利。';
 const leadEn = 'This site (The Way, One Thread) is a personal blog. This privacy policy describes how this site handles visitors’ personal information — what we collect, why we collect it, whether it is shared with third parties, how long it is retained, and the rights you have over the information we hold.';
-const oneLinerZh = '不追踪、不画像、不投放广告、不卖数据。只有你主动留评论时才会留下信息；页面水印会读取你的 IP 和设备时区用于防盗，但不存库、不外发。';
-const oneLinerEn = 'No tracking, no profiling, no ads, no selling data. Information is only left behind when you choose to post a comment; the page watermark reads your IP and device time zone to deter content theft, but it is never stored or shared.';
+const oneLinerZh = '不做跨站追踪、不画像、不投放广告、不卖数据。只有你主动留评论时才会留下信息；页面水印会读取你的 IP 和设备时区用于防盗，但不存库、不外发。';
+const oneLinerEn = 'No cross-site tracking, no profiling, no advertising, and no data sales. The only information you directly provide is when you post a comment. For the page watermark, the site reads your IP address and device time zone at render time. The site itself does not store this information or send it to third parties.';
 const tocLabel = lang === 'zh' ? '目录' : 'Contents';
 ---
 
@@ -163,16 +163,16 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             <ul>
               <li>不使用 Cookie、不使用本地存储、不做设备指纹识别。</li>
               <li>记录的是页面级聚合指标：浏览量、来源、国家/地区、页面性能。</li>
-              <li>因为不涉及个人标识，按通行做法<strong>无需征求同意</strong>，也不提供单独开关。</li>
+              <li>Cloudflare 说明其 Web Analytics 不收集或使用访客个人数据，也不使用 Cookie 或设备指纹进行统计。它与可选启用的 Google Analytics 相互独立，本站也不提供单独的开关。</li>
             </ul>
             <h3>2. Google Analytics（默认不加载，需你同意）</h3>
             <ul>
               <li>首次访问时，页面底部会出现一个横幅，询问是否允许加载 Google Analytics。</li>
-              <li><strong>「同意」和「拒绝」两个按钮的样式完全对等</strong>，没有默认选中，也不存在「关闭按钮藏在角落」这类设计。</li>
+              <li>两个选项均无默认选中，且按钮样式同等突出。</li>
               <li><strong>在你点击「同意」之前，Google Analytics 的脚本根本不会被下载</strong>——不是加载后再阻止上报，而是完全不请求。</li>
               <li>点「拒绝」后，Google Analytics 永不加载，站点功能不受任何影响。</li>
               <li>无论你选哪个，选择都会记在浏览器本地，之后不再重复询问；清除浏览器数据后会重新询问。</li>
-              <li>同意后它协助衡量的指标包括：页面浏览量、会话数、平均互动时长、跳出情况、新老访客比例与回访情况。启用 IP 匿名化，不用于广告投放或跨站重定向。</li>
+              <li>同意后它协助衡量的指标包括：页面浏览量、会话数、平均互动时长、跳出情况、新老访客比例与回访情况。Google Analytics 在收集时使用 IP 地址提供基础服务与大致地理位置，但不会记录或存储原始 IP 地址。相关数据不用于广告投放或跨站重定向。</li>
             </ul>
             <h3>3. 国内访客的实际体验</h3>
             <p>Google Analytics 的脚本位于 <code>googletagmanager.com</code>，在中国大陆部分网络下<strong>可能无法加载或极慢</strong>。这种情况下即便你点了「同意」，也不会有数据上报——这属于网络限制，不是本站的行为。这也是本站仍然需要 Cloudflare Web Analytics 的原因：它是国内访客唯一能被可靠统计到的渠道。</p>
@@ -207,7 +207,7 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             <h2 id="crossborder">九、关于跨境与未成年人</h2>
             <ul>
               <li>本站数据存储于境外云服务（Supabase 与 Cloudflare 的全球节点）。若你同意加载 Google Analytics，相关统计数据还会传至 Google（美国）。</li>
-              <li>访问本站即意味着相关数据可能在你所在国家/地区之外处理。</li>
+              <li>相关数据可能在你所在国家/地区之外处理。</li>
               <li>本站是个人内容站点，不面向未成年人定向收集信息，也不会主动收集任何人的敏感个人信息（如身份证号、生物特征、精确地理位置等）。</li>
             </ul>
 
@@ -240,7 +240,7 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             </table></div>
             <blockquote>These two are read at render time only to assemble the watermark text. They are <strong>never written to the database, never written to access logs, and never sent to any third party.</strong></blockquote>
             <h3>Involving only the site owner</h3>
-            <p>The admin panel uses Supabase accounts, held only by the site owner. Passwords are stored as one-way hashes. Visitors need no account and no login to read or comment.</p>
+            <p>The admin panel uses Supabase authentication, and only the site owner has an account. Passwords are stored as one-way hashes. Visitors need no account and no login to read or comment.</p>
 
             <h2 id="use">2. How each item is used</h2>
             <div class="table-wrap"><table>
@@ -310,16 +310,16 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             <ul>
               <li>No cookies, no local storage, no device fingerprinting.</li>
               <li>Records aggregated page-level metrics: page views, referrers, country/region, and page performance.</li>
-              <li>Because no personal identifier is involved, consent is <strong>not required</strong> under common practice, and there is no separate switch.</li>
+              <li>Cloudflare states that Web Analytics does not collect or use visitors' personal data and does not use cookies or device fingerprinting for analytics. It runs independently of the optional Google Analytics service and has no separate opt-out control on this site.</li>
             </ul>
             <h3>2. Google Analytics (not loaded by default, requires your consent)</h3>
             <ul>
               <li>On your first visit, a banner appears at the bottom of the page asking whether Google Analytics may be loaded.</li>
-              <li><strong>The "Accept" and "Decline" buttons are visually identical.</strong> Nothing is pre-selected, and there is no "close button hidden in a corner" pattern.</li>
+              <li>Neither option is preselected, and both buttons are equally prominent.</li>
               <li><strong>Before you click "Accept", the Google Analytics script is not downloaded at all</strong> — it is not a matter of loading then blocking; the request is never made.</li>
               <li>If you decline, Google Analytics is never loaded, and no site feature is affected.</li>
               <li>Either way, your choice is stored locally in your browser, so you will not be asked again. Clearing browser data resets the question.</li>
-              <li>Once accepted, the metrics it helps measure include page views, sessions, average engagement time, bounce behaviour, and the ratio of new versus returning visitors. IP anonymisation is enabled, and the data is not used for advertising or cross-site retargeting.</li>
+              <li>Once you accept, Google Analytics can measure page views, sessions, average engagement time, bounce behaviour, and the ratio of new to returning visitors. Google Analytics uses IP addresses at collection time for basic service functions and approximate location reporting, but does not log or store the raw IP addresses. The data is not used for advertising or cross-site retargeting through this site.</li>
             </ul>
             <h3>3. The practical experience for visitors in mainland China</h3>
             <p>The Google Analytics script lives on <code>googletagmanager.com</code>, which <strong>may fail to load or be very slow on some networks in mainland China</strong>. Even if you accept, no data may be reported — that is a network limitation, not something this site does. It is also why Cloudflare Web Analytics remains necessary: it is the only channel through which visitors in mainland China can be reliably counted.</p>
@@ -354,7 +354,7 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             <h2 id="crossborder">9. Cross-border transfers and minors</h2>
             <ul>
               <li>Data is stored on cloud services outside mainland China (Supabase and Cloudflare global nodes). If you consent to Google Analytics, related analytics data is also transferred to Google (United States).</li>
-              <li>By visiting this site, you understand that relevant data may be processed outside your country or region.</li>
+              <li>Relevant data may be processed outside your country or region.</li>
               <li>This is a personal content site. It does not knowingly collect information from minors, and it does not collect sensitive personal information (such as ID numbers, biometrics, or precise location).</li>
             </ul>
 
@@ -409,10 +409,14 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
     writing-mode: vertical-rl;
     letter-spacing: 0.12em;
-    transition: background .15s, color .15s;
+    transition: background .15s, color .15s, opacity .18s;
   }
   .toc-fab svg { writing-mode: horizontal-tb; }
   .toc-fab:hover { background: var(--bg-soft); color: var(--accent); }
+  /* 抽屉打开时隐藏触发按钮，避免其透过遮罩露出一块深色 */
+  body.toc-open .toc-fab { opacity: 0; pointer-events: none; }
+  /* 阅读/滑动时淡化按钮，减少对右下内容的遮挡 */
+  .toc-fab.scrolling { opacity: 0.22; }
 
   /* 抽屉背后的遮罩 */
   .toc-overlay {
@@ -517,6 +521,12 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
     -webkit-overflow-scrolling: touch;
     margin: 1.75em 0;
   }
+  /* 表格溢出时在边缘渐隐，提示可以左右滑动 */
+  .table-wrap.is-scroll { box-shadow: inset -18px 0 14px -14px rgba(0, 0, 0, 0.28); }
+  .table-wrap.is-scroll-left { box-shadow: inset 18px 0 14px -14px rgba(0, 0, 0, 0.28); }
+  .table-wrap.is-scroll.is-scroll-left {
+    box-shadow: inset 18px 0 14px -14px rgba(0, 0, 0, 0.28), inset -18px 0 14px -14px rgba(0, 0, 0, 0.28);
+  }
   .prose table {
     display: table;
     width: 100%;
@@ -573,25 +583,39 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
   @media (max-width: 880px) {
     .privacy-page { max-width: 760px; }
     .toc-drawer { width: 86vw; }
-    /* 竖排贴边按钮在窄屏会压住正文，改为右下角浮动胶囊，避开底部提示条 */
+    /* 窄屏改为右下角小圆形图标按钮：占用面积最小，尽量不压正文；文字由抽屉标题承担 */
     .toc-fab {
       top: auto;
-      bottom: 132px;
+      bottom: 120px;
       right: 16px;
       transform: none;
       writing-mode: horizontal-tb;
+      width: 46px;
+      height: 46px;
+      padding: 0;
+      justify-content: center;
       border-right: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 0.55rem 0.9rem;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+      border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     }
+    .toc-fab span { display: none; }
+    .toc-fab svg { width: 18px; height: 18px; }
   }
 
-  /* 窄屏：表格收紧内边距与字号；宽表（如 Cookie 表）恢复自动列宽并横向滚动 */
+  /* 窄屏：表格按内容排布——短内容列不拆词，长内容列折行，整体超宽时横向滚动 */
   @media (max-width: 600px) {
-    .prose table { font-size: 14px; }
-    .prose th, .prose td { padding: 9px 10px; }
-    .prose table.table-wide { table-layout: auto; min-width: 560px; }
+    .prose table {
+      font-size: 13.5px;
+      table-layout: auto;
+    }
+    .prose th, .prose td { padding: 8px 10px; max-width: 220px; }
+    /* 首列（信息 / 名称 / 数据）多为短标识，禁止拆词，避免「发表评论时」被拆成两行 */
+    .prose td:first-child, .prose th:first-child { white-space: nowrap; }
+    /* 3 列及以上：给足最小宽度，短内容不拆词，超出部分横向滚动（:where 降低优先级，宽表规则可覆盖） */
+    .prose table:where(:has(thead th:nth-child(3))) { min-width: 480px; }
+    /* 宽表（Cookie 5 列）恢复自动列宽，整体至少 560px，超出横向滚动 */
+    .prose table.table-wide { min-width: 560px; }
+    .prose table.table-wide th, .prose table.table-wide td { width: auto; }
   }
 </style>
 
@@ -608,6 +632,7 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
     overlay.hidden = false;
     drawer.setAttribute('aria-hidden', 'false');
     fab.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('toc-open');
     document.body.style.overflow = 'hidden';
     closeBtn.focus();
   }
@@ -616,10 +641,32 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
     overlay.classList.remove('open');
     drawer.setAttribute('aria-hidden', 'true');
     fab.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('toc-open');
     document.body.style.overflow = '';
     setTimeout(() => { overlay.hidden = true; }, 220);
     fab.focus();
   }
+
+  // 表格横向溢出时显示边缘渐隐，提示可左右滑动
+  document.querySelectorAll('.table-wrap').forEach((wrap) => {
+    const update = () => {
+      const max = wrap.scrollWidth - wrap.clientWidth;
+      const scrollable = max > 2;
+      wrap.classList.toggle('is-scroll', scrollable && wrap.scrollLeft < max - 2);
+      wrap.classList.toggle('is-scroll-left', scrollable && wrap.scrollLeft > 2);
+    };
+    update();
+    wrap.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+  });
+
+  // 滚动时淡化目录按钮，减少对正文的遮挡
+  let tocScrollTimer;
+  window.addEventListener('scroll', () => {
+    fab?.classList.add('scrolling');
+    clearTimeout(tocScrollTimer);
+    tocScrollTimer = setTimeout(() => fab?.classList.remove('scrolling'), 600);
+  }, { passive: true });
 
   fab?.addEventListener('click', openToc);
   closeBtn?.addEventListener('click', closeToc);
