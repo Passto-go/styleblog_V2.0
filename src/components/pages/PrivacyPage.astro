@@ -616,6 +616,11 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
     /* 宽表（Cookie 5 列）恢复自动列宽，整体至少 560px，超出横向滚动 */
     .prose table.table-wide { min-width: 560px; }
     .prose table.table-wide th, .prose table.table-wide td { width: auto; }
+    /* 宽表首列是 styleblog-my-comments 这类长标识，不能沿用上面的 nowrap，
+       否则会溢出单元格、压到第二列文字上；这里允许按词/字符断行 */
+    .prose table.table-wide td:first-child,
+    .prose table.table-wide th:first-child { white-space: normal; min-width: 118px; }
+    .prose table.table-wide td:first-child code { white-space: normal; word-break: normal; overflow-wrap: break-word; }
   }
 </style>
 
