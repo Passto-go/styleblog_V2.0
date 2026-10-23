@@ -23,13 +23,17 @@ const t = useTranslations(lang);
 const DEFAULT_GA_ID = 'G-RY0SNN3G81';
 const GA_ID = import.meta.env.PUBLIC_GA_ID || DEFAULT_GA_ID;
 const privacyHref = localizePath('/privacy', lang);
+
+// 文案里的 {link} 是隐私说明链接的占位符：拆成前后两段，
+// 把 <a> 插在中间，链接就落在句子内部（详见 <a>隐私说明</a>。），
+// 而不是句末再挂一个重复的独立入口。
+const consentParts = t('consent.text').split('{link}');
 ---
 {GA_ID && (
   <div id="consent-banner" class="consent-banner" hidden>
     <div class="consent-inner">
       <p class="consent-text">
-        {t('consent.text')}
-        <a href={privacyHref} class="consent-link">{t('consent.more')}</a>
+        {consentParts[0]}<a href={privacyHref} class="consent-link">{t('consent.more')}</a>{consentParts[1] ?? ''}
       </p>
       <div class="consent-actions">
         <button type="button" class="consent-btn consent-reject" data-consent="denied">{t('consent.reject')}</button>
@@ -119,8 +123,8 @@ const privacyHref = localizePath('/privacy', lang);
     color: var(--text, #1f2328);
     opacity: 0.88;
   }
+  /* 链接已嵌在句子内部，不再需要额外的左侧间距（中文「详见」后不应有空格） */
   .consent-link {
-    margin-left: 0.25rem;
     text-decoration: underline;
     white-space: nowrap;
   }
