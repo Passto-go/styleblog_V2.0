@@ -136,6 +136,10 @@ export const ui = {
 
     'footer.copyright': 'Copyright © {year} 老一贯',
     'footer.license': '转载请注明出处，禁止整篇转载与商用',
+    'consent.text': '本站使用 Google Analytics 统计访问情况，以了解内容是否受欢迎。这会在你的浏览器中写入 Cookie。',
+    'consent.more': '隐私说明',
+    'consent.accept': '同意',
+    'consent.reject': '拒绝',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
     'footer.clock': '北京时间 · UTC+8',
@@ -270,6 +274,10 @@ export const ui = {
 
     'footer.copyright': 'Copyright © {year} Lao Yiguan',
     'footer.license': 'Quote with attribution; no full repost or commercial use',
+    'consent.text': 'This site uses Google Analytics to understand which posts are read, which sets cookies in your browser.',
+    'consent.more': 'Privacy notice',
+    'consent.accept': 'Accept',
+    'consent.reject': 'Decline',
     'footer.powered': 'Powered by Astro',
     'footer.hosted': 'Hosted by Cloudflare',
     'footer.clock': 'Beijing time · UTC+8',

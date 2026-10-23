@@ -1,0 +1,154 @@
+---
+// Cookie / 统计同意横幅（Consent Banner）
+//
+// 目的：满足 GDPR 等法规对「非必要 Cookie」的要求——在访客明确同意之前，
+// 绝不加载 Google Analytics（GA4）脚本，也不写入任何 _ga 类 Cookie。
+//
+// 工作方式：
+//   ① 页面加载时先读 localStorage 里的选择（granted / denied）
+//   ② 只有 granted 时才注入 gtag.js；denied 或未选择时完全不加载
+//   ③ 未选择时在页面底部展示横幅，提供「同意」与「拒绝」两个同等权重的按钮
+//   ④ 选择结果持久化，之后不再打扰
+//
+// Cloudflare Web Analytics 不在此列——它不使用 Cookie、不做跨站追踪，
+// 属于「非 Cookie 类基础统计」，无需征得同意，因此由 Cloudflare 边缘自动注入。
+import { useTranslations, localizePath } from '../i18n/ui.js';
+
+const { lang = 'zh' } = Astro.props;
+const t = useTranslations(lang);
+
+// GA4 衡量 ID：通过 PUBLIC_GA_ID 环境变量注入（构建期内联）。
+// 未配置时整个功能自动降级为「只显示 Cloudflare 统计」，不渲染横幅、不加载脚本。
+const GA_ID = import.meta.env.PUBLIC_GA_ID || '';
+const privacyHref = localizePath('/privacy', lang);
+---
+{GA_ID && (
+  <div id="consent-banner" class="consent-banner" hidden>
+    <div class="consent-inner">
+      <p class="consent-text">
+        {t('consent.text')}
+        <a href={privacyHref} class="consent-link">{t('consent.more')}</a>
+      </p>
+      <div class="consent-actions">
+        <button type="button" class="consent-btn consent-reject" data-consent="denied">{t('consent.reject')}</button>
+        <button type="button" class="consent-btn consent-accept" data-consent="granted">{t('consent.accept')}</button>
+      </div>
+    </div>
+  </div>
+)}
+
+{GA_ID && (
+  <script is:inline define:vars={{ GA_ID }}>
+    (function () {
+      var KEY = 'analytics-consent';   // 值：'granted' | 'denied'
+      var banner = document.getElementById('consent-banner');
+      if (!banner) return;
+
+      var loaded = false;
+
+      function loadGA() {
+        if (loaded) return;
+        loaded = true;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+        document.head.appendChild(s);
+
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { window.dataLayer.push(arguments); }
+        window.gtag = gtag;
+        gtag('js', new Date());
+        // 同意模式下不发送广告相关信号，仅保留基础分析
+        gtag('config', GA_ID, { anonymize_ip: true });
+      }
+
+      function read() {
+        try { return localStorage.getItem(KEY); } catch (e) { return null; }
+      }
+      function write(v) {
+        try { localStorage.setItem(KEY, v); } catch (e) {}
+      }
+
+      var choice = read();
+
+      if (choice === 'granted') {
+        loadGA();                       // 已同意：直接加载，不显示横幅
+      } else if (choice === 'denied') {
+        // 已拒绝：什么也不做
+      } else {
+        banner.hidden = false;          // 尚未选择：展示横幅
+      }
+
+      banner.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-consent]');
+        if (!btn) return;
+        var v = btn.getAttribute('data-consent');
+        write(v);
+        banner.hidden = true;
+        if (v === 'granted') loadGA();
+      });
+    })();
+  </script>
+)}
+
+<style>
+  .consent-banner {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 9999;                 /* 高于水印（9998），保证可点击 */
+    background: var(--bg, #fff);
+    border-top: 1px solid var(--border, #d0d7de);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  }
+  .consent-inner {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0.875rem 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+  }
+  .consent-text {
+    flex: 1 1 320px;
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--text, #1f2328);
+    opacity: 0.88;
+  }
+  .consent-link {
+    margin-left: 0.25rem;
+    text-decoration: underline;
+    white-space: nowrap;
+  }
+  .consent-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  .consent-btn {
+    font: inherit;
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.9375rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    border: 1px solid var(--border, #d0d7de);
+    background: transparent;
+    color: var(--text, #1f2328);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  .consent-btn:hover { background: var(--bg-soft, #f6f8fa); }
+  /* 同意与拒绝视觉权重一致，避免暗黑模式（dark pattern） */
+  .consent-accept {
+    border-color: var(--accent, #0969da);
+    color: var(--accent, #0969da);
+  }
+  .consent-accept:hover { background: var(--accent-soft, #ddf4ff); }
+
+  @media (max-width: 600px) {
+    .consent-inner { padding: 0.75rem 1rem 0.875rem; }
+    .consent-actions { width: 100%; }
+    .consent-btn { flex: 1; }
+  }
+</style>

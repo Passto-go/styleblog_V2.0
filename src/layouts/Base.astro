@@ -2,6 +2,7 @@
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Watermark from '../components/Watermark.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
 import { useTranslations, localizePath, languages } from '../i18n/ui.js';
 
 const {
@@ -88,5 +89,7 @@ const ogImage = image
     </main>
     <Footer lang={lang} />
     <Watermark lang={lang} />
+    <!-- 统计同意横幅：仅在配置 PUBLIC_GA_ID 时渲染；未同意前不加载 GA -->
+    <ConsentBanner lang={lang} />
   </body>
 </html>
