@@ -17,9 +17,11 @@ import { useTranslations, localizePath } from '../i18n/ui.js';
 const { lang = 'zh' } = Astro.props;
 const t = useTranslations(lang);
 
-// GA4 衡量 ID：通过 PUBLIC_GA_ID 环境变量注入（构建期内联）。
-// 未配置时整个功能自动降级为「只显示 Cloudflare 统计」，不渲染横幅、不加载脚本。
-const GA_ID = import.meta.env.PUBLIC_GA_ID || '';
+// GA4 衡量 ID：优先取 PUBLIC_GA_ID 环境变量（构建期内联），
+// 未配置时回退到 DEFAULT_GA_ID（站点正式衡量 ID），保证线上开箱可用。
+// 如需临时关闭统计，把两者清空即可——此时横幅不渲染、GA 不加载。
+const DEFAULT_GA_ID = 'G-RY0SNN3G81';
+const GA_ID = import.meta.env.PUBLIC_GA_ID || DEFAULT_GA_ID;
 const privacyHref = localizePath('/privacy', lang);
 ---
 {GA_ID && (
