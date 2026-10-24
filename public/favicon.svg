@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 雾霾蓝圆底 -->
+  <circle cx="32" cy="32" r="32" fill="#7D9DBA"/>
+  <!-- 终端提示符 > -->
+  <path d="M4.8 29.4 L7.6 32.75 L4.8 36.1"
+        fill="none" stroke="#F6F1E8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 一根贯穿的线：水平基线为"一"，金色关节即调试断点 -->
+  <path d="M8.5 32.75 L26.9 32.75 L31.1 17.3 L34.5 44.7 L38.2 32.75 L39.5 30.8 L41.0 32.75 L58 32.75"
+        fill="none" stroke="#F6F1E8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- T 波上升沿的金色段 -->
+  <path d="M36.8 39.2 L38.5 33.2"
+        fill="none" stroke="#E4C78A" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- 金色关节：断点 / 波峰 -->
+  <circle cx="26.9" cy="32.75" r="1.1" fill="#E4C78A"/>
+  <circle cx="31.1" cy="17.3" r="1.1" fill="#E4C78A"/>
+  <circle cx="41.0" cy="32.75" r="1.1" fill="#E4C78A"/>
+  <!-- 终端光标块 -->
+  <rect x="59.4" y="29.9" width="2.6" height="5.7" rx="0.6" fill="#E4C78A"/>
+</svg>

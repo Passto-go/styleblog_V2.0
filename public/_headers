@@ -6,3 +6,17 @@
 # 图片等静态资源：缓存 1 天
 /avatar.png
   Cache-Control: public, max-age=86400
+
+# Favicon 等长期不变的静态资源：长期强缓存（改版请加 ?v=2 刷新）
+/favicon.ico
+  Cache-Control: public, max-age=31536000, immutable
+/favicon.svg
+  Cache-Control: public, max-age=31536000, immutable
+/android-chrome-192x192.png
+  Cache-Control: public, max-age=31536000, immutable
+/android-chrome-512x512.png
+  Cache-Control: public, max-age=31536000, immutable
+/apple-touch-icon.png
+  Cache-Control: public, max-age=31536000, immutable
+/site.webmanifest
+  Cache-Control: public, max-age=86400
