@@ -336,7 +336,21 @@ export async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192,
     }
 
     if (resp.ok) {
-      const data = await resp.json();
+      // L-10：200 但响应体不是 JSON（网关错误页 / 空 body / 截断）时，
+      // resp.json() 会抛 SyntaxError，一路冒到 API 层变成 5xx。
+      // 这里就地兜住，当作可重试的服务端异常处理，与 5xx 分支同一套退避。
+      let data;
+      try {
+        const raw = await resp.text();
+        data = JSON.parse(raw);
+      } catch {
+        status = 502;
+        lastDetail = '模型返回了非 JSON 响应（可能是网关错误页或被截断）';
+        if (attempt >= RETRY_DELAYS.length) break;
+        // L-09：显式兜底，避免数组长度/循环条件调整后出现 sleep(undefined) 立即重试
+        await sleep(RETRY_DELAYS[attempt] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1] ?? 3000);
+        continue;
+      }
       const choice = data?.choices?.[0];
       const msg = choice?.message;
       const text = msg?.content;
@@ -376,7 +390,9 @@ export async function chat({ baseUrl, apiKey, model, messages, maxTokens = 8192,
     lastDetail = await resp.text().catch(() => '');
     const overloaded = status === 503 || status === 429 || status >= 500;
     if (!overloaded || attempt >= RETRY_DELAYS.length) break;
-    await sleep(RETRY_DELAYS[attempt]);
+    // L-09：attempt 只会落在 [0, RETRY_DELAYS.length) 区间内（上一行已 break），
+    // 但取值仍显式兜底，避免将来调整数组长度/循环条件后出现 sleep(undefined) 立即重试。
+    await sleep(RETRY_DELAYS[attempt] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1] ?? 3000);
   }
 
   let msg = `翻译服务返回 ${status}`;

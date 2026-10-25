@@ -10,8 +10,11 @@ const prefix = (lang, path) => (lang === 'zh' ? path : `/${lang}${path}`);
 
 export async function GET(context) {
   // 域名唯一来源：Astro.site（由 PUBLIC_SITE_URL 构建变量注入）。
-  // 不再写死域名兜底——换域名只需改环境变量，此处零改动。
-  // 本地未配置时，Astro.site 为空，加载的是 localhost 兜底地址（不影响线上）。
+  // 生产构建期已强制校验 PUBLIC_SITE_URL（见 astro.config.mjs），site 必定存在；
+  // localhost 兜底只覆盖本地 dev 与 preview 分支构建，且会打日志提醒，不再静默。
+  if (!context.site) {
+    console.warn('[sitemap] 未取到 Astro.site，使用 localhost 兜底（仅 dev/preview 会出现）');
+  }
   const base = context.site ?? new URL('http://localhost:4321');
 
   const urls = [];

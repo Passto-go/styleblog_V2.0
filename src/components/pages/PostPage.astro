@@ -17,16 +17,20 @@ const { html, headings } = renderMarkdown(post.content || '');
 const dateStr = formatDate(post.published_at, lang);
 const catHref = post.categorySlug ? localizePath(`/categories/${post.categorySlug}/`, lang) : null;
 
-// 上下篇导航：相邻关系按「当前语言视图」的文章顺序取（每篇只含该语言最匹配的版本），
-// 避免跳到另一语言的同名文章；标题则用该文章在目标语言下的译文（无译文才保留原文），
-// 否则英文页会直接露出中文标题。
-const allPosts = await getAllPosts(lang);
-const displayTitle = titleResolver(await getAllPostsEveryLang(), lang);
+// 【性能】以下查询互不依赖，并行发出（原先串行累加，TTFB 被多条往返叠加）。
+// 注意：getAllPosts(lang) 与 getAllPostsEveryLang() 内部命中同一份缓存/去重，
+// 并行不会造成重复请求翻倍。
+const [allPosts, everyLang, cats, avatar] = await Promise.all([
+  getAllPosts(lang),
+  getAllPostsEveryLang(),
+  getCategories(lang, { skipPosts: true }),
+  getAvatar(),
+]);
+// 标题用该文章在目标语言下的译文（无译文才保留原文），否则英文页会直接露出中文标题。
+const displayTitle = titleResolver(everyLang, lang);
 // 分类名以注册表为准：按 post.category_slug 反查当前语言名称，缺行才回退中文快照
-const cats = await getCategories(lang, { skipPosts: true });
 const catMap = toCategoryMap(cats);
 const postCatName = catMap.get(post.categorySlug)?.name || post.category;
-const avatar = await getAvatar();
 const wordCount = (post.content || '').replace(/\s+/g, '').length;
 const readMinutes = readingMinutes(post.content);
 const idx = allPosts.findIndex((p) => p.slug === post.slug);
@@ -47,11 +51,21 @@ const nextPost = idx > -1 && idx < allPosts.length - 1 ? allPosts[idx + 1] : nul
 // 该语言没有译文时，findTranslation 返回中文原文 → 链接仍指向当前文章，
 // 用户留在本页（UI 变目标语言，正文回退中文）；仅当文章完全不存在时才回退该语言首页。
 const langHrefs = {};
+// L-06：没有对应语言译文时，hreflang 不应指向该语言首页（错误语言信号）。
+const missingLangs = [];
 for (const code of Object.keys(languages)) {
   if (code === lang) continue;
   const tr = await findTranslation(post.slug, code);
-  langHrefs[code] = tr ? localizePath(`/posts/${tr.slug}/`, code) : localizePath('/', code);
+  if (tr) {
+    langHrefs[code] = localizePath(`/posts/${tr.slug}/`, code);
+  } else {
+    // 语言切换按钮仍需可点（回退到该语言首页），但 hreflang 不输出
+    langHrefs[code] = localizePath('/', code);
+    missingLangs.push(code);
+  }
 }
+// 当前文章自身语言若就是「无译文」的那一侧，也要把对侧从 hreflang 里摘掉
+const excludeLangHrefs = missingLangs.slice();
 
 // 无译文提示横幅：当前语言缺「已发布译文」时告知读者现状。
 // 判定条件（与 lib/posts.js 的 pickDisplayLang 级联保持一致）：
@@ -113,7 +127,7 @@ const missingNotice = (() => {
 </style>
 
 {/* image：封面仅用于分享缩略图（og:image / twitter:image），正文页不渲染封面大图 */}
-<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs} image={post.cover || ''} type="article" robots={post.is_encrypted ? 'noindex, nofollow' : undefined}>
+<Base lang={lang} title={post.title} description={post.excerpt || ''} langHrefs={langHrefs} excludeLangHrefs={excludeLangHrefs} image={post.cover || ''} type="article" robots={post.is_encrypted ? 'noindex, nofollow' : undefined}>
   <div class="reading-bar" aria-hidden="true"><div class="reading-bar-fill" id="reading-fill"></div></div>
   <div class="post-head">
     <div class="post-head-inner">
@@ -181,7 +195,7 @@ const missingNotice = (() => {
         </section>
       )}
       {unlocked && <Share lang={lang} url={shareUrl} title={post.title} />}
-      {unlocked && <Comments lang={lang} page={pagePath} />}
+      {unlocked && <Comments lang={lang} page={'/posts/' + postBaseSlug + '/'} />}
       <p class="back"><a href={localizePath('/', lang)}>{t('post.back')}</a></p>
     </article>
   </div>

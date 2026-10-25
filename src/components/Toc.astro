@@ -1,13 +1,19 @@
 ---
-// 文章目录（TOC）：接收由 markdown 提取的标题数组，渲染带滚动高亮的侧边目录
+// 文章目录（TOC）：接收由 markdown 提取的标题数组。
+// 版式：
+//   · 宽屏（>1100px）：右侧固栏常驻侧边卡片（原体验不变）；
+//   · 窄屏（≤1100px）：右缘「目录」竖排按钮 → 点击滑出抽屉（与隐私页一致），
+//     不再把目录沉到正文最底部（L-17：原先手机端要滑到文章末尾才看得到目录）。
 const { headings = [], lang = 'zh' } = Astro.props;
 import { useTranslations } from '../i18n/ui.js';
 const t = useTranslations(lang);
+const tocLabel = t('post.toc');
+const closeLabel = lang === 'en' ? 'Close' : '关闭';
 ---
 {headings.length > 0 && (
   <div class="aside-card toc-card">
-    <h3 class="aside-title">{t('post.toc')}</h3>
-    <nav class="toc-nav">
+    <h3 class="aside-title">{tocLabel}</h3>
+    <nav class="toc-nav toc-nav-static">
       {headings.map((h) => (
         <a class={`toc-link toc-h${h.level}`} href={`#${h.id}`} data-target={h.id}>{h.text}</a>
       ))}
@@ -15,34 +21,194 @@ const t = useTranslations(lang);
   </div>
 )}
 
+{headings.length > 0 && (
+  <Fragment>
+    <button
+      class="toc-fab"
+      type="button"
+      aria-controls="post-toc-drawer"
+      aria-expanded="false"
+      aria-label={tocLabel}
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>{tocLabel}</span>
+    </button>
+
+    <div class="toc-overlay" data-toc-close hidden></div>
+
+    <aside class="toc-drawer" id="post-toc-drawer" aria-hidden="true" aria-label={tocLabel}>
+      <div class="toc-head">
+        <span class="toc-head-title">{tocLabel}</span>
+        <button class="toc-close" type="button" aria-label={closeLabel}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav class="toc-nav toc-nav-drawer">
+        {headings.map((h) => (
+          <a class={`toc-link toc-h${h.level}`} href={`#${h.id}`} data-target={`${h.id}--d`}>{h.text}</a>
+        ))}
+      </nav>
+    </aside>
+  </Fragment>
+)}
+
+<style is:global>
+  /* ---------- 宽屏：常驻卡片（保持原样），抽屉相关元素全部隐藏 ---------- */
+  .toc-fab, .toc-overlay, .toc-drawer { display: none; }
+
+  @media (max-width: 1100px) {
+    /* 窄屏：隐藏常驻卡片，改为右缘竖排触发按钮 + 抽屉 */
+    .toc-card { display: none; }
+
+    .toc-fab {
+      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+      z-index: 80; display: inline-flex; align-items: center; gap: .4rem;
+      padding: .6rem .7rem; border: 1px solid var(--border); border-right: 0;
+      border-radius: 10px 0 0 10px; background: var(--surface); color: var(--text-strong);
+      font: inherit; font-size: .85rem; cursor: pointer;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, .08);
+      writing-mode: vertical-rl; letter-spacing: .12em;
+      transition: background .15s, color .15s, opacity .18s;
+    }
+    .toc-fab svg { writing-mode: horizontal-tb; }
+    .toc-fab:hover { background: var(--bg-soft); color: var(--accent); }
+    body.toc-open .toc-fab { opacity: 0; pointer-events: none; }
+    .toc-fab.scrolling { opacity: .22; }
+
+    .toc-overlay {
+      display: block; position: fixed; inset: 0; z-index: 85;
+      background: rgba(0, 0, 0, .32); opacity: 0; pointer-events: none;
+      transition: opacity .22s ease;
+    }
+    .toc-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .toc-drawer {
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; right: 0; height: 100%; width: 320px; max-width: 86vw;
+      z-index: 90; background: var(--surface); border-left: 1px solid var(--border);
+      box-shadow: -8px 0 28px rgba(0, 0, 0, .12);
+      transform: translateX(100%); transition: transform .26s ease;
+    }
+    .toc-drawer.open { transform: translateX(0); }
+    .toc-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 1.1rem; border-bottom: 1px solid var(--border);
+    }
+    .toc-head-title {
+      font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .toc-close {
+      display: inline-flex; padding: .3rem; border: 0; background: transparent;
+      color: var(--muted); border-radius: 6px; cursor: pointer; line-height: 0;
+    }
+    .toc-close:hover { background: var(--bg-soft); color: var(--text-strong); }
+    .toc-nav-drawer { padding: .6rem .7rem 1.4rem; overflow-y: auto; }
+  }
+
+  @media (max-width: 480px) {
+    /* 手机：缩成右下角小圆形按钮，尽量不压正文 */
+    .toc-fab {
+      top: auto; bottom: 120px; right: 16px; transform: none;
+      writing-mode: horizontal-tb; width: 46px; height: 46px; padding: 0;
+      justify-content: center; border-right: 1px solid var(--border); border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+    }
+    .toc-fab span { display: none; }
+    .toc-fab svg { width: 18px; height: 18px; }
+    .toc-drawer { width: 86vw; }
+  }
+
+  body.toc-open { overflow: hidden; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toc-drawer, .toc-overlay { transition-duration: .01ms; }
+  }
+</style>
+
 <script>
-  // 平滑滚动 + 滚动高亮当前章节
-  const links = Array.from(document.querySelectorAll('.toc-link'));
-  if (links.length) {
-    const map = new Map(links.map((l) => [l.getAttribute('data-target'), l]));
-    links.forEach((l) => {
+  // 平滑滚动 + 滚动高亮当前章节（常驻卡片与抽屉共用一套逻辑）
+  const allLinks = Array.from(document.querySelectorAll('.toc-link'));
+  if (allLinks.length) {
+    // 高亮按「标题 id」归并：抽屉链接的 data-target 带 --d 后缀，需还原
+    const idOf = (l) => (l.getAttribute('data-target') || '').replace(/--d$/, '');
+    const map = new Map();
+    allLinks.forEach((l) => {
+      const id = idOf(l);
+      if (!map.has(id)) map.set(id, []);
+      map.get(id).push(l);
+    });
+
+    // ---------- 抽屉开合（窄屏） ----------
+    const fab = document.querySelector('.toc-fab');
+    const drawer = document.querySelector('.toc-drawer');
+    const overlay = document.querySelector('.toc-overlay');
+    const closeBtn = document.querySelector('.toc-close');
+    function openToc() {
+      if (!drawer || !overlay) return;
+      overlay.hidden = false;
+      requestAnimationFrame(() => {
+        drawer.classList.add('open');
+        overlay.classList.add('open');
+      });
+      drawer.setAttribute('aria-hidden', 'false');
+      fab?.setAttribute('aria-expanded', 'true');
+      document.body.classList.add('toc-open');
+      closeBtn?.focus();
+    }
+    function closeToc() {
+      if (!drawer || !overlay) return;
+      drawer.classList.remove('open');
+      overlay.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
+      fab?.setAttribute('aria-expanded', 'false');
+      document.body.classList.remove('toc-open');
+      setTimeout(() => { if (!drawer.classList.contains('open')) overlay.hidden = true; }, 240);
+      fab?.focus();
+    }
+    fab?.addEventListener('click', openToc);
+    closeBtn?.addEventListener('click', closeToc);
+    overlay?.addEventListener('click', closeToc);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawer?.classList.contains('open')) closeToc();
+    });
+
+    // 滚动时淡化触发按钮，减少遮挡
+    let scrollTimer;
+    window.addEventListener('scroll', () => {
+      fab?.classList.add('scrolling');
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => fab?.classList.remove('scrolling'), 600);
+    }, { passive: true });
+
+    // ---------- 点击跳转 ----------
+    allLinks.forEach((l) => {
       l.addEventListener('click', (e) => {
         e.preventDefault();
-        const id = l.getAttribute('data-target');
+        const id = idOf(l);
         const el = document.getElementById(id);
         if (el) {
+          if (drawer?.classList.contains('open')) closeToc();
           el.scrollIntoView({ behavior: 'smooth', block: 'start' });
           history.replaceState(null, '', '#' + id);
         }
       });
     });
+
+    // ---------- 滚动高亮 ----------
     const obs = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            links.forEach((l) => l.classList.remove('active'));
-            const link = map.get(entry.target.id);
-            if (link) link.classList.add('active');
-          }
+          if (!entry.isIntersecting) return;
+          allLinks.forEach((l) => l.classList.remove('active'));
+          (map.get(entry.target.id) || []).forEach((l) => l.classList.add('active'));
         });
       },
       { rootMargin: '-80px 0px -65% 0px', threshold: 0 }
     );
-    document.querySelectorAll('h2[id], h3[id]').forEach((h) => obs.observe(h));
+    document.querySelectorAll('.post-main h2[id], .post-main h3[id]').forEach((h) => obs.observe(h));
+
+    // L-05：离开页面时断开观察器，避免在 bfcache / 多次往返后残留监听
+    window.addEventListener('pagehide', () => obs.disconnect());
   }
 </script>

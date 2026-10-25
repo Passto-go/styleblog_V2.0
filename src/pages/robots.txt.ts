@@ -36,8 +36,12 @@ export const HEAD: APIRoute = ({ site }) =>
   });
 
 export const GET: APIRoute = ({ site }) => {
-  // 兜底地址仅用于本地未配 PUBLIC_SITE_URL 时，不影响线上
+  // 正常情况 site 一定存在（astro.config.mjs 在生产构建期就强制校验 PUBLIC_SITE_URL）。
+  // 兜底只覆盖两种边缘：本地 dev、以及 preview 分支构建（两者都允许无正式域名）。
   const base = site ?? new URL('http://localhost:4321');
+  if (!site) {
+    console.warn('[robots.txt] 未取到 Astro.site，使用 localhost 兜底（仅 dev/preview 会出现）');
+  }
 
   return new Response(build(base), {
     headers: {

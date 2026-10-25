@@ -131,6 +131,10 @@ export const ui = {
     'post.commentDeleted': '已删除',
     'post.commentTokenMissing': '注意：未能保存删除凭证，日后可能无法删除此评论。',
 
+    // 评论合并展示：异语言评论语言徽标（固定字样，不随页面语言翻译，便于一眼辨识）
+    'post.commentLangZh': '中文',
+    'post.commentLangEn': 'EN',
+
     // 无译文提示（文章页横幅）：当前语言缺已发布译文时说明现状
     'article.missingEn': '本文暂无英文版。',
     'article.readEn': '阅读英文版 →',
@@ -275,6 +279,10 @@ export const ui = {
     'post.commentDeleted': 'Deleted',
     'post.commentTokenMissing': 'Note: the deletion token was not saved — you may be unable to delete this comment later.',
 
+    // 评论合并展示：异语言评论语言徽标（固定字样，不随页面语言翻译，便于一眼辨识）
+    'post.commentLangZh': '中文',
+    'post.commentLangEn': 'EN',
+
     // Translation notice (article banner): shown when the current language has no published version
     'article.missingEn': 'This article is not yet available in English.',
     'article.readEn': 'Read the English version →',
@@ -301,7 +309,8 @@ export const ui = {
 
 export function getLangFromUrl(url) {
   const seg = url.pathname.split('/').filter(Boolean)[0];
-  // 仅 zh / en 为合法语言前缀；其余（含空段，即根路径）一律回退默认语言（en）
+  // 仅 zh / en 为合法语言前缀；其余（含空段，即根路径）一律回退默认语言
+  // （defaultLang 见文件顶部，当前为 'zh'。别在这里写死语言码，改默认值时容易漏改）
   return seg === 'zh' || seg === 'en' ? seg : defaultLang;
 }
 

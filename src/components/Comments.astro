@@ -9,6 +9,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
 ---
 {configured ? (
   <section class="comments" id="comments" data-page={page} data-lang={lang}
+    data-lang-zh={t('post.commentLangZh')} data-lang-en={t('post.commentLangEn')}
     data-required={t('post.commentRequired')}
     data-sending={t('post.commentSending')}
     data-error={t('post.commentError')}
@@ -125,6 +126,8 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     root.dataset.inited = '1';
     const page = root.dataset.page || '';
     const lang = root.dataset.lang || 'zh';
+    const tLangZh = root.dataset.langZh || '中文';
+    const tLangEn = root.dataset.langEn || 'EN';
     const tRequired = root.dataset.required || '评论内容不能为空。';
     const tSending = root.dataset.sending || '发送中…';
     const tError = root.dataset.error || '评论发送失败，请稍后重试。';
@@ -187,6 +190,13 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         const badge = document.createElement('span');
         badge.className = 'comment-badge comment-badge--admin';
         badge.textContent = lang === 'en' ? 'Admin' : '管理员';
+        head.appendChild(badge);
+      }
+      // 合并评论后，与当前页面语言不同的评论加语言徽标，便于读者一眼区分来源语言
+      if (c.lang && c.lang !== lang) {
+        const badge = document.createElement('span');
+        badge.className = 'comment-badge comment-badge--lang';
+        badge.textContent = c.lang === 'en' ? tLangEn : tLangZh;
         head.appendChild(badge);
       }
 
@@ -357,7 +367,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       try {
         const { data, error } = await supabase
           .from('comments')
-          .select('id, author, content, created_at, parent_id, is_admin')
+          .select('id, author, content, created_at, parent_id, is_admin, lang')
           .eq('page', page)
           .eq('approved', true)
           .order('created_at', { ascending: true });
@@ -418,6 +428,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     // 实时：审核通过的评论自动出现（仅已通过；订阅失败不影响展示）
     // 说明：这是一项「锦上添花」的增强。失败时（如边缘代理丢失 Authorization 头、
     // 项目未开启 Realtime）只尝试 1 次并静默放弃，绝不无限重连刷控制台。
+    let sub = null;
     try {
       // 显式把 anon key 作为 Realtime 凭据写入握手：
       // 部分部署路径（Cloudflare 代理）会丢掉 WS 请求的 Authorization 头，
@@ -427,7 +438,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       // 用 DOM 属性作为「已判定失败」的持久标志：
       // 闭包变量在压缩后可能与 catch(e) 的 e 同名，导致标志判断失真，
       // 而 dataset 不参与作用域，任何路径读到的都是同一份状态。
-      const sub = supabase
+      sub = supabase
         .channel('comments:' + page)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'comments',
@@ -459,6 +470,17 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     } catch (e) {
       console.info('[comments] 实时订阅已跳过（不影响评论功能）', e);
     }
+
+    // L-05：页面进入 bfcache / 被卸载时显式退订，避免残留频道与重连定时器；
+    // 从 bfcache 回退时 Supabase 连接往往已断开，这里不自动重建（重建交给用户刷新），
+    // 评论功能本身不依赖实时推送，退订不影响手动刷新查看。
+    window.addEventListener('pagehide', () => {
+      if (!sub) return;
+      Promise.resolve()
+        .then(() => supabase.removeChannel(sub))
+        .catch(() => {})
+        .then(() => { try { supabase.realtime.disconnect(); } catch (_) {} });
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -498,6 +520,7 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
           p_author: author.slice(0, 40),
           p_email: email.slice(0, 120),
           p_content: content.slice(0, 1000),
+          p_lang: lang,
         });
 
         if (error) {

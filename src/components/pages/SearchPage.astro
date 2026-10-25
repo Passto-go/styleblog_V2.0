@@ -35,6 +35,15 @@ const t = useTranslations(lang);
 
     let docs = null;
 
+    // 文案常量提到 render 之前：render 里用到的 tipNo 必须先有定义
+    // （render 只在 input 事件里被调用，但保持「先声明后使用」更不易踩 TDZ）
+    const labels = {
+      zh: { reading: '正在加载…', tip: '输入关键词开始搜索。', no: '没有找到相关文章。', found: (n) => `找到 ${n} 篇相关文章` },
+      en: { reading: 'Loading…', tip: 'Type a keyword to start searching.', no: 'No matching posts found.', found: (n) => `${n} posts found` },
+    };
+    const L = labels[lang] || labels.zh;
+    const tipNo = L.no;
+
     async function load() {
       if (docs) return docs;
       try {
@@ -47,9 +56,25 @@ const t = useTranslations(lang);
       return docs;
     }
 
+    // L-03：搜索索引里的 title/excerpt/category 来自后台可写内容，
+    // 直接拼进 innerHTML 等于把它们当 HTML 执行（存储型 XSS 面）。
+    // 统一先转义再拼接；href 只允许站内路径 + 安全 slug 字符。
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+    // slug 只保留 URL 安全字符，杜绝 `"` 逃逸属性、`javascript:` 之类的协议注入
+    function safeSlug(s) {
+      return String(s || '').replace(/[^a-zA-Z0-9\-_./\u4e00-\u9fa5]/g, '');
+    }
+
     function render(items) {
       if (!items.length) {
-        results.innerHTML = `<p class="empty">${tipNo}</p>`;
+        results.innerHTML = `<p class="empty">${esc(tipNo)}</p>`;
         return;
       }
       results.innerHTML = items
@@ -57,16 +82,16 @@ const t = useTranslations(lang);
           (p) => {
             // 条目自带 lang/slug（来自 getAllPostsEveryLang），直接拼出对应语言链接，
             // 不再依赖仅在服务端可用的 localizePath（避免在浏览器侧抛 ReferenceError）。
-            const href = (p.lang === 'en' ? '/en/posts/' : '/posts/') + p.slug + '/';
+            const href = (p.lang === 'en' ? '/en/posts/' : '/posts/') + safeSlug(p.slug) + '/';
             return `
         <article class="card">
-          <a class="card-link" href="${href}">
+          <a class="card-link" href="${esc(href)}">
             <div class="card-body">
-              <div class="card-meta"><time>${p.date}</time>${
-              p.category ? `<span class="cat-tag">${p.category}</span>` : ''
+              <div class="card-meta"><time>${esc(p.date)}</time>${
+              p.category ? `<span class="cat-tag">${esc(p.category)}</span>` : ''
             }</div>
-              <h2>${p.title}</h2>
-              ${p.excerpt ? `<p>${p.excerpt}</p>` : ''}
+              <h2>${esc(p.title)}</h2>
+              ${p.excerpt ? `<p>${esc(p.excerpt)}</p>` : ''}
             </div>
           </a>
         </article>`;
@@ -74,13 +99,6 @@ const t = useTranslations(lang);
         )
         .join('');
     }
-
-    const labels = {
-      zh: { reading: '正在加载…', tip: '输入关键词开始搜索。', no: '没有找到相关文章。', found: (n) => `找到 ${n} 篇相关文章` },
-      en: { reading: 'Loading…', tip: 'Type a keyword to start searching.', no: 'No matching posts found.', found: (n) => `${n} posts found` },
-    };
-    const L = labels[lang] || labels.zh;
-    const tipNo = L.no;
 
     input.addEventListener('input', async () => {
       const q = input.value.trim().toLowerCase();

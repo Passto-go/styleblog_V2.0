@@ -232,6 +232,11 @@ Astro.response.headers.set('Cache-Control', 'no-store');
             <button type="button" data-f="pending">待审核</button>
             <button type="button" data-f="approved">已通过</button>
             <button type="button" data-f="rejected">未通过</button>
+            <select id="cm-lang" class="wb-cm-lang" aria-label="评论语言筛选">
+              <option value="all">全部语言</option>
+              <option value="zh">中文</option>
+              <option value="en">EN</option>
+            </select>
           </div>
           <ul id="cm-list" class="wb-list"></ul>
         </div>
@@ -1284,7 +1289,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
   }
 
   // ---------- 评论管理 ----------
-  const cmState = { filter: 'all' };
+  const cmState = { filter: 'all', lang: 'all' };
 
   function cmStatusOf(c) {
     if (c.approved) return 'approved';
@@ -1303,7 +1308,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const counts = { all: all.length, pending: 0, approved: 0, rejected: 0 };
     all.forEach((c) => { counts[cmStatusOf(c)]++; });
     $('cm-count').textContent = `待审 ${counts.pending} · 通过 ${counts.approved} · 未过 ${counts.rejected}`;
-    const rows = all.filter((c) => cmState.filter === 'all' || cmStatusOf(c) === cmState.filter);
+    let rows = all.filter((c) => cmState.filter === 'all' || cmStatusOf(c) === cmState.filter);
+    // 合并评论后 page 统一为基准路径，语言只能靠 lang 列区分；按语言筛选
+    rows = rows.filter((c) => cmState.lang === 'all' || (c.lang || 'zh') === cmState.lang);
     if (!rows.length) { ul.innerHTML = '<li class="wb-empty">没有匹配的评论</li>'; return; }
     ul.innerHTML = '';
     rows.forEach((c) => ul.appendChild(renderCommentItem(c)));
@@ -1317,6 +1324,8 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     const metaExtra = [];
     if (c.is_admin) metaExtra.push('<span class="wb-cm-badge wb-cm-badge--admin">管理员</span>');
     if (c.parent_id) metaExtra.push('<span class="wb-cm-replyof">↳ 回复</span>');
+    if (c.lang && c.lang !== 'zh')
+      metaExtra.push('<span class="wb-cm-badge wb-cm-badge--lang">' + (c.lang === 'en' ? 'EN' : escapeHtml(c.lang)) + '</span>');
     const body = document.createElement('div');
     body.className = 'wb-cm-body';
     body.innerHTML =
@@ -3378,6 +3387,9 @@ Astro.response.headers.set('Cache-Control', 'no-store');
       $('cm-filter').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       loadComments();
     });
+    // 评论管理：语言筛选（合并评论后 page 已统一，语言只能靠 lang 列区分）
+    const cmLangSel = $('cm-lang');
+    if (cmLangSel) cmLangSel.onchange = () => { cmState.lang = cmLangSel.value; loadComments(); };
 
     // 评论管理：实时订阅（管理员侧，审核/删除后自动刷新）
     try {

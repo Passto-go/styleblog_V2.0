@@ -38,8 +38,12 @@ function fmtDate(iso, l) {
   return d.toLocaleDateString('zh-CN', { ...opts, month: 'long' });
 }
 const dateStr = fmtDate(target, lang);
+// L-04：目标时间非法（后台填错格式 / 空值）时，服务端先校验；
+// 非法则整块不渲染，避免页面上出现「NaN 天 NaN 时」和一个永远在跑的定时器。
+const isValidTarget = !!tzTarget && !Number.isNaN(new Date(tzTarget).getTime());
 const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
 ---
+{isValidTarget && (
 <section class="widget">
   <h4 class="widget-title">
     <Icon name="clock" size={15} /> {t('widget.countdown')}
@@ -55,6 +59,7 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
     ))}
   </div>
 </section>
+)}
 
 <script define:vars={{ target: tzTarget }}>
   (function () {
@@ -62,10 +67,16 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
     if (!el) return;
     // target 已在服务端归一化为带 +08:00 的 ISO，本地解析即北京时间终点
     var end = new Date(target).getTime();
+    // L-04 双保险：服务端已过滤非法目标，这里再判一次 NaN
+    // （NaN 参与比较恒为 false，会绕过 diff < 0 的钳制，直接把 NaN 写进 DOM）
+    if (!isFinite(end)) {
+      el.querySelectorAll('[data-cd]').forEach(function (n) { n.textContent = '--'; });
+      return;
+    }
     function p2(n) { return String(n).padStart(2, '0'); }
     function tick() {
       var diff = end - Date.now();
-      if (diff < 0) diff = 0;
+      if (!isFinite(diff) || diff < 0) diff = 0;
       var d = Math.floor(diff / 86400000);
       var h = Math.floor((diff % 86400000) / 3600000);
       var m = Math.floor((diff % 3600000) / 60000);
@@ -76,6 +87,11 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
       el.querySelector('[data-cd="s"]').textContent = p2(s);
     }
     tick();
-    setInterval(tick, 1000);
+    var timer = setInterval(tick, 1000);
+    // L-05：页面进入 bfcache / 离开时清掉定时器，回来再重启，避免后台空转
+    window.addEventListener('pagehide', function () { clearInterval(timer); });
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) { clearInterval(timer); tick(); timer = setInterval(tick, 1000); }
+    });
   })();
 </script>

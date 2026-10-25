@@ -710,5 +710,11 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
       { rootMargin: '-80px 0px -65% 0px', threshold: 0 }
     );
     document.querySelectorAll('h2[id]').forEach((h) => obs.observe(h));
+
+    // L-05：离开页面时断开观察器（bfcache 回退时重新观察）
+    window.addEventListener('pagehide', () => obs.disconnect());
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) document.querySelectorAll('h2[id]').forEach((h) => obs.observe(h));
+    });
   }
 </script>

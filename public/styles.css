@@ -269,11 +269,11 @@ a { color: inherit; }
 .search-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search-status { color: var(--muted); font-size: 14px; margin: 14px 0 4px; }
 
-/* ---------- 文章详情 ---------- */
-.post { max-width: 720px; margin: 0 auto; padding: 40px 20px 64px; }
-.post h1 { font-size: 30px; line-height: 1.35; margin: 0 0 10px; color: var(--text-strong); }
+/* ---------- 文章详情 ----------
+   L-15：原 `.post` / `.post h1` / `.cat-link` 三条规则全站无对应元素
+   （现在的容器是 .post-head + .post-layout + .post-main），属于早期版式残留。
+   保留的只有真正在用的 .post-meta 与 .content。 */
 .post-meta { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 14px; margin-bottom: 6px; }
-.cat-link { color: var(--accent); text-decoration: none; font-weight: 600; }
 .content { margin-top: 22px; font-size: 16.5px; color: var(--text); }
 .content h1, .content h2, .content h3 { line-height: 1.4; margin: 1.6em 0 .6em; }
 .content h2 { font-size: 23px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
@@ -837,6 +837,9 @@ a { color: inherit; }
 .wb-cm-badge { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 7px; border: 1px solid; }
 .wb-cm-badge--admin { color: #0969da; border-color: #c9e0ff; background: #eef5ff; }
 [data-theme="dark"] .wb-cm-badge--admin { color: #58a6ff; border-color: #1f3b5c; background: #112031; }
+.wb-cm-badge--lang { color: #8250df; border-color: #e3d3fb; background: #f6f0ff; }
+[data-theme="dark"] .wb-cm-badge--lang { color: #c8a4f0; border-color: #3a2d57; background: #1e1530; }
+.wb-cm-lang { margin-left: auto; font-size: 12px; padding: 3px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .wb-cm-replyof { font-size: 11.5px; color: var(--muted); }
 .wb-cm-reply { color: #0969da; border-color: #c9e0ff; }
 .wb-cm-reply:hover { background: #eef5ff; }
@@ -906,8 +909,17 @@ a { color: inherit; }
 }
 @media (max-width: 720px) {
   .header-inner { height: auto; flex-wrap: wrap; padding: 10px 0; gap: 8px; }
-  .main-nav { order: 3; width: 100%; justify-content: flex-start; gap: 10px; flex-wrap: wrap; overflow-x: auto; }
+  /* L-16：原写法同时 flex-wrap:wrap 与 overflow-x:auto，两个方向都在「接管溢出」，
+     结果取决于内容宽度与浏览器实现，行为不确定。导航项数量有限且都很短，
+     统一为「只换行、不横滑」：不会出现被裁切看不全的入口，也无需手指横滑。 */
+  .main-nav { order: 3; width: 100%; justify-content: flex-start; gap: 10px; flex-wrap: wrap; overflow-x: visible; }
   .header-actions { margin-left: auto; }
+
+  /* L-13：顶栏在窄屏会换成两行，实际高度约 100~112px。
+     标题锚点偏移与 TOC 的 sticky top 同步调大，否则点目录跳转后标题被顶栏遮住。 */
+  .post-main h2[id], .post-main h3[id],
+  .content h2, .content h3 { scroll-margin-top: 112px; }
+  .post-aside { top: 112px; }
 }
 @media (max-width: 600px) {
   .post-item { flex-direction: column; gap: 10px; }
@@ -1041,7 +1053,8 @@ a { color: inherit; }
 .toc-h3 { padding-left: 26px; font-size: 13px; }
 .toc-link.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
 
-/* 标题锚点滚动偏移 */
+/* 标题锚点滚动偏移（L-13：桌面顶栏 64px → 72px 足够；
+   移动端顶栏换行变高（约 110px），偏移由下方 720px 断点统一调大） */
 .post-main h2[id], .post-main h3[id] { scroll-margin-top: 72px; }
 .post-main h2 { margin-top: 34px; }
 .post-main h3 { margin-top: 24px; }
@@ -1164,6 +1177,8 @@ a { color: inherit; }
 .comment-badge { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; border: 1px solid; white-space: nowrap; }
 .comment-badge--admin { color: #0969da; border-color: #c9e0ff; background: #eef5ff; }
 [data-theme="dark"] .comment-badge--admin { color: #58a6ff; border-color: #1f3b5c; background: #112031; }
+.comment-badge--lang { color: #57606a; border-color: #d0d7de; background: #f6f8fa; }
+[data-theme="dark"] .comment-badge--lang { color: #8b949e; border-color: #30363d; background: #161b22; }
 .comments-empty { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
 .comments-note { color: var(--muted); font-size: 14px; margin: 0; }
 

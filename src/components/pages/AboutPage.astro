@@ -23,11 +23,29 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
+// 链接协议白名单（L-02）：只放行 http/https/mailto 与站内单斜杠路径。
+// 注意不能写成「以 / 开头就放行」——`//evil.com` 也以 / 开头，浏览器当成协议相对外链；
+// 更不能放行 `javascript:` / `data:text/html`，那等于给自己留了个存储型 XSS 后门
+// （虽然 about_content 只有管理员能写，但一次手滑复制粘贴就足够中招）。
+function safeHref(url) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (/^(https?:\/\/|mailto:)/i.test(u)) return u;
+  if (/^\/(?!\/)/.test(u)) return u; // 站内绝对路径
+  return '';
+}
+
 // 行内语法：**粗体** → <strong>，[文字](网址) → <a>；先整体转义再做替换，保证安全
 function inline(s) {
   return escapeHtml(s)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text, url) => {
+      // 注意：此处 s 已被 escapeHtml 转义，URL 中的 & 已变成 &amp;，
+      // 协议判断不受影响（协议串里没有 &），但回写进 href 时要保持转义后的形态。
+      const href = safeHref(url);
+      if (!href) return text; // 协议不安全：降级为纯文字，不生成链接
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    });
 }
 
 // 按空行切段；以「## 」开头的段落渲染为二级小标题，其余为正文段落

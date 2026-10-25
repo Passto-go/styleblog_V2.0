@@ -28,12 +28,24 @@ export function json(data: unknown, status = 200) {
 
 /** 内存滑窗限流（兜底）。每次调用顺手清掉过期记录，防止 Map 无限增长。 */
 const hits = new Map<string, number[]>();
+// L-11：上限 500 时，长期存活的 isolate 在高基数 key（如按 userId/IP 分桶）下
+// 会频繁触发全表扫描，而扫描本身是 O(n)。这里把阈值放到 2000，
+// 并顺手清理空数组，让 Map 的容量随活跃 key 数收敛，而不是只增不删。
+const MEM_MAX_KEYS = 2000;
 export function memRateLimit(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
-  // 轻量自清理：Map 过大时按过期时间扫一遍
-  if (hits.size > 500) {
+  // 轻量自清理：Map 过大时按过期时间扫一遍（每次全扫，只在超阈值时触发）
+  if (hits.size > MEM_MAX_KEYS) {
     for (const [k, arr] of hits) {
       if (!arr.some((t) => now - t < windowMs)) hits.delete(k);
+    }
+    // 扫描后仍然超限：说明是真实高基数活跃流量，按插入顺序淘汰最老的 key，
+    // 避免 Map 无上限增长（淘汰代价只是该 key 的计数归零，可接受）。
+    if (hits.size > MEM_MAX_KEYS) {
+      for (const k of hits.keys()) {
+        if (hits.size <= MEM_MAX_KEYS) break;
+        hits.delete(k);
+      }
     }
   }
   const arr = (hits.get(key) || []).filter((t) => now - t < windowMs);
@@ -82,6 +94,8 @@ export async function rateLimitKV(
         p_window_sec: windowSec,
       });
       if (trace) trace.path = 'db';
+      // 只有明确的 true 才算放行；其余（false / null / 类型异常）一律拒绝，
+      // 保持 fail-closed，避免 RPC 返回形状变化时被误判为放行。
       if (!error) return data === true;
       if (trace) trace.err = error.message;
       console.warn('[rate-limit] RPC 失败，退回内存限流:', error.message);

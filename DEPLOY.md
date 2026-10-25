@@ -42,9 +42,13 @@
    |---|---|---|
    | `PUBLIC_SUPABASE_URL` | `https://xxxx.supabase.co` | 是 |
    | `PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` 那串 anon public key | 是 |
-   | `PUBLIC_SITE_URL` | `https://<项目名>.workers.dev` | 建议 |
+   | `PUBLIC_SITE_URL` | `https://你的正式域名`（如 `https://hxlss.cn`） | **是** |
    | `NODE_VERSION` | `22` | 建议（仓库已有 `.nvmrc`，双保险） |
    | `UNLOCK_SECRET` | `openssl rand -hex 32` 生成的值 | 用文章加密才需（也可配成运行时 Secret，见下） |
+
+   > **`PUBLIC_SITE_URL` 是必填项，不是「建议」**（2026-11-02 起）。它是 canonical / og:url / RSS / sitemap / robots.txt 的唯一域名来源，且**只认这一处**——本地 `.env` 不进仓库，Cloudflare 构建读不到。
+   > 漏配时：生产构建直接失败并提示变量名；本地 `dev` 与 `preview` 分支仅告警。值必须带 `https://` 协议头，结尾斜杠会自动归一化。
+   > 详见 `域名变更操作手册.md`。
 
    > `UNLOCK_SECRET` 有两种配法，代码双路兼容（运行时优先）：**① Secret（推荐）**：Settings → Variables and Secrets → Add（Type: Secret），改密钥免重建；**② 构建变量**：加进上表，值随构建内联进 Worker。
 
@@ -147,7 +151,10 @@ directory = "./dist"
 | 文章发布了但页面没有 | 几乎不可能（无构建环节）；先确认 `published=true` | 访问 `/search-index.json` 看文章在不在 |
 | 页面 404 但文章确实存在 | slug 输错 / 语言不匹配（`/en/posts/` 只列 en 文章） | 从列表页点进去，别手拼 URL |
 | Supabase 临时故障 | 拉取失败会回退示例文章（保留的降级逻辑） | 站点不崩，恢复后自动正常 |
-| sitemap / RSS / canonical 里是错域名 | `PUBLIC_SITE_URL` 没改；或（自建分支）`astro.config.mjs` 在 config 加载期读不到 `.env` | 改 Settings → Builds 的构建变量后 Retry deployment；本仓库已改用 Vite `loadEnv` 显式读取 `.env`（Astro 不会把 `.env` 注入该阶段的 `process.env`） |
+| 构建失败，日志提示「缺少环境变量 PUBLIC_SITE_URL」 | 构建环境变量里没配 `PUBLIC_SITE_URL`（L-07 有意阻断，避免 canonical 静默指向 example.com） | 在 Settings → Builds → Build environment variables 补上 `PUBLIC_SITE_URL=https://你的域名`，再 Retry deployment |
+| 构建失败，日志提示「不是合法 URL」 | 值漏了协议头（如写成 `hxlss.cn`） | 改成 `https://hxlss.cn` 形式；结尾斜杠会被自动归一化 |
+| 构建失败，日志提示「只支持 http/https」 | 值用了 `ftp://`、`file://` 等协议 | 改为 `https://` |
+| sitemap / RSS / canonical 里是错域名 | ① `PUBLIC_SITE_URL` 没改；② **只改了本地 `.env`**——该文件不进仓库，Cloudflare 构建读不到 | 改 Settings → Builds 的**构建环境变量**后 Retry deployment。注意 `.env` 只影响本地 `npm run build`/`astro dev` |
 | Worker CPU 超限（免费 10ms/调用） | 超长文 marked 渲染耗时 | 当前文章量级远未触顶；真触顶再加边缘缓存 |
 | 加密文章输对密码却刷新后回到密码框 | `UNLOCK_SECRET` 被设为「构建变量」后中途改动，新旧 Worker 实例签名不一致；或浏览器未发送 cookie | 改用 Secret 类型配置（运行时统一读取）；确认协议为 https（本地 http 下 secure cookie 不生效属预期） |
 | 后台保存加密文章报「请填写访问密码」 | 勾了启用加密但密码框为空，且该文章此前没设过密码 | 填一个 ≥4 位密码再保存；仅想改提示可留空密码（沿用原密码） |
