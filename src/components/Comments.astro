@@ -424,8 +424,10 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
       // 导致 Supabase 收到「no valid credentials」；显式 setAuth 可避免依赖默认推导。
       try { supabase.realtime.setAuth(SUPABASE_ANON_KEY); } catch (_) { /* 旧版本无该方法时忽略 */ }
 
-      let settled = false;
-      const channel = supabase
+      // 用 DOM 属性作为「已判定失败」的持久标志：
+      // 闭包变量在压缩后可能与 catch(e) 的 e 同名，导致标志判断失真，
+      // 而 dataset 不参与作用域，任何路径读到的都是同一份状态。
+      const sub = supabase
         .channel('comments:' + page)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'comments',
@@ -437,19 +439,18 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
         }, () => { loadPublic(); })
         .subscribe(function (status) {
           if (status === 'SUBSCRIBED') {
-            settled = true;
+            root.dataset.realtime = 'ok';
             return;
           }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            if (!settled) {
-              // 首次就没连上：说明环境不支持实时推送，直接退订并断开底层 WS，
-              // 避免 supabase-js 继续自动重连刷日志（removeChannel 只删 channel，不关连接）
-              console.info('[comments] 实时推送不可用，改为手动刷新查看新评论（不影响评论功能）');
-              try { supabase.removeChannel(channel); } catch (_) {}
-              try { supabase.realtime.disconnect(); } catch (_) {}
-            }
-            settled = true;
-          }
+          if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT' && status !== 'CLOSED') return;
+          // 只记录一次：后续同状态的重复回调直接丢弃，避免日志刷屏
+          if (root.dataset.realtime === 'down') return;
+          root.dataset.realtime = 'down';
+          // 首次就没连上：说明当前环境不支持实时推送，退订后不再重试。
+          // 注意这里只 removeChannel，不调 realtime.disconnect()——
+          // 后者会让底层连接进入关闭流程，反而再触发一轮状态回调。
+          console.info('[comments] 实时推送不可用，改为手动刷新查看新评论（不影响评论功能）');
+          try { supabase.removeChannel(sub); } catch (_) {}
         });
     } catch (e) {
       console.info('[comments] 实时订阅已跳过（不影响评论功能）', e);
