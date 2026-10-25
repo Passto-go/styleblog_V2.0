@@ -12,6 +12,6 @@ jobs:
       - name: Ping Supabase REST API
         run: |
           RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/posts?select=*&limit=1&apikey=${{ secrets.SUPABASE_ANON_KEY }}")
+            "${{ secrets.SUPABASE_URL }}/rest/v1/posts_public?select=id&limit=1&apikey=${{ secrets.SUPABASE_ANON_KEY }}")
           echo "$RESP"
           echo "$RESP" | tail -n1 | grep -q "200" || exit 1
