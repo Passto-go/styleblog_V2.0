@@ -1,7 +1,7 @@
 // 双语（zh / en）文案与路由辅助
-// 默认语言 = 英文（无前缀驻留根路径，如 /about）；中文迁入 /zh/（如 /zh/about）。
-// 见 src/pages 目录结构：根 = 英文，zh/ = 中文。
-export const defaultLang = 'en';
+// 默认语言 = 中文（无前缀驻留根路径，如 /about）；英文迁入 /en/（如 /en/about）。
+// 见 src/pages 目录结构：根 = 中文，en/ = 英文。
+export const defaultLang = 'zh';
 
 // switchLabel = 在“另一种语言”的页面里，这个链接显示的文案（即“切过去”的目标语言）
 export const languages = {

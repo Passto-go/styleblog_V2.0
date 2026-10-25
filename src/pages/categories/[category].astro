@@ -1,24 +1,32 @@
 ---
 import CategoryPage from '../../components/pages/CategoryPage.astro';
 import FourOhFour from '../404.astro';
-import { getCategories } from '../../lib/posts.js';
+import {
+  getCategories,
+  getRegisteredCategorySlugs,
+  getCategoryAlias,
+  slugify,
+} from '../../lib/posts.js';
 
 // SSR：每请求现查 Supabase，新分类/新文章发布后即刻可访问，无需重新构建
-// 常量路径优先（如 /en/categories/travelogues/）：Astro 会先匹配静态文件，所以带尾斜杠的
-// 规范地址仍由常量页渲染（与改动前完全一致）；不带尾斜杠的同一 slug 会落到这里，
-// 统一 301 到规范地址，避免同一分类出现两个可访问 URL。
-// 注意：exploration 没有常量页，不能放进这个集合，否则会被跳到不存在的地址。
-const CONSTANT_SLUGS = new Set(['travelogues', 'thoughts', 'techstack']);
 const { category } = Astro.params;
+const cats = await getCategories('zh');
+let cat = cats.find((c) => c.slug === category) || null;
 
-if (CONSTANT_SLUGS.has(category)) {
-  const canonical = `/en/categories/${category}/`;
-  if (Astro.url.pathname !== canonical) return Astro.redirect(canonical, 301);
+// 兼容层：分类改名后，旧 slug 不再精确匹配。
+// 若请求的 slug 恰好等于某分类「显示名 slugify」的衍生值，则 301 跳转到正确 slug（覆盖仅改显示名的场景）。
+if (!cat) {
+  // 严格 301：旧 slug 映射到新 slug（重命名分类改 slug 后写入 category_aliases）
+  const alias = await getCategoryAlias(category);
+  if (alias) return Astro.redirect(`/categories/${alias}`, 301);
+  // 兼容层：仅改了显示名、slug 随之变（未手动改 slug）的场景。
+  // 旧逻辑用「当前显示名」反推 slug，会误判：未注册在 categories 表、但文章里存在的 slug
+  // （历史脏数据）经过这里会被跳到「按文章分类名 slugify」猜出来的地址，可能 404。
+  // 现在只对「请求的 slug 确实属于某个已注册分类的中文名 slugify」的情况放行。
+  const registered = new Set(await getRegisteredCategorySlugs());
+  const byName = cats.find((c) => registered.has(c.slug) && slugify(c.name) === category);
+  if (byName) return Astro.redirect(`/categories/${byName.slug}`, 301);
+  Astro.response.status = 404;
 }
-
-// 只为「已注册分类」渲染；注册表里没有的 slug 一律 404，避免与常量页重复内链
-const cat = (await getCategories('en', { skipPosts: true }))
-  .find((c) => c.slug === category && c.fromRegistry) || null;
-if (!cat) Astro.response.status = 404;
 ---
-{cat ? <CategoryPage lang="en" slug={cat.slug} /> : <FourOhFour lang="en" />}
+{cat ? <CategoryPage lang="zh" slug={cat.slug} /> : <FourOhFour lang="zh" />}
