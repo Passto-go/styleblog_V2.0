@@ -71,6 +71,9 @@ export default defineConfig({
   // sitemap/搜索索引全部走 SSR；站点没有 /login 路由，登录入口是 /admin/（静态后台页）。
   // 由于全部走 SSR，_routes.json 的 include 为 ["/*"]，静态资源同样经过 Worker。
   output: 'server',
-  adapter: cloudflare({ platformProxy: { enabled: true } }),
+  // 预渲染环境回退为 Node：Astro 7 + adapter 14 默认用 workerd 预渲染，沙箱/部分 CI
+  // 环境跑不起 workerd（ECONNREFUSED），且预渲染页仅 SSR 拉取 Supabase（网络，Node 可跑）。
+  // Cloudflare 构建期用 Node 预渲染同样合法。后续若需 workerd 特性能改回 'workerd'。
+  adapter: cloudflare({ platformProxy: { enabled: true }, prerenderEnvironment: 'node' }),
   trailingSlash: 'ignore',
 });

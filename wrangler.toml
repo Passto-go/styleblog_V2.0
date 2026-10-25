@@ -1,5 +1,8 @@
 name = "mystyle"
-main = "dist/_worker.js/index.js"
+# Astro 7 + @astrojs/cloudflare v14：main 改为适配器统一入口（不再指向构建产物路径）。
+# 该值不以 .js 结尾，Cloudflare vite-plugin 不再要求文件预先存在，避免构建期报
+# "main field doesn't point to an existing file"。
+main = "@astrojs/cloudflare/entrypoints/server"
 compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
 account_id = "2cc5e3ce9320936d151487ce230e8344"
