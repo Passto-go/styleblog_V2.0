@@ -173,38 +173,47 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     const runtimeEnv = (locals as any)?.runtime?.env || {};
     // 文章锁定与限流都走 Supabase 原子函数；配置缺失或数据库异常时内部退回内存
     const sbCfg = { url: supabaseUrl, anon: supabaseAnon };
-    // Supabase 原子计数（跨实例一致）；异常时内部退回内存限流，不会放行失控
     const rlTrace: RateLimitTrace = { path: 'db' };
-    const rlOk = await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60, {
+
+    // 【性能】限流与 body 解析互不依赖，限流请求先发出、并行解析 body。
+    // 此前是「限流 → 解析 → 查锁定 → 验密码 → 记失败」五段全串行，
+    // 每段一次边缘到 Supabase 的往返（实测约 215ms/次），
+    // 加上 CF 边缘到客户端的 TLS，访客侧累计 1.7～3.1s，表现为「点了没反应」。
+    const rlPromise = rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60, {
       url: supabaseUrl,
       anon: supabaseAnon,
     }, rlTrace);
-    if (!rlOk) {
-      const r = json({ ok: false, code: 'too_many', error: '尝试过于频繁，请稍后再试' }, 429);
-      r.headers.set('x-rl-path', rlTrace.path);
-      r.headers.set('x-rl-ip', ip);
-      return r;
-    }
 
     let body: any;
     try {
       body = await request.json();
     } catch {
+      await rlPromise; // 等限流落库，避免计数悬空
       return json({ ok: false, error: '请求格式错误' }, 400);
     }
     const base = baseSlug(String(body?.slug || '').trim());
     const password = String(body?.password || '');
     if (!base || !password) {
+      await rlPromise;
       return json({ ok: false, error: '缺少必要参数' }, 400);
     }
     // 密码上限 128 位：避免超长输入拖慢 bcrypt 比较（DoS 面）
     if (password.length > 128) {
+      await rlPromise;
       return json({ ok: false, code: 'wrong_password', error: '密码错误' }, 401);
     }
 
-    // 文章维度锁定检查（在调用 DB 之前拦截，省算力也防爆破）
+    // 【性能】锁定检查与限流并行：两者都只依赖 base / ip，互不依赖。
     const failKey = `fail:${base}`;
-    const lockSec = await lockedForKV(sbCfg, failKey);
+    const [rlOk, lockSec] = await Promise.all([
+      rlPromise,
+      lockedForKV(sbCfg, failKey),
+    ]);
+    if (!rlOk) {
+      const r = json({ ok: false, code: 'too_many', error: '尝试过于频繁，请稍后再试' }, 429);
+      r.headers.set('x-rl-path', rlTrace.path);
+      return r;
+    }
     if (lockSec > 0) {
       return json(
         {
@@ -258,7 +267,15 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     }
 
     // 校验通过：清掉该文章的失败计数，签发签名 cookie（base.signature）。
-    await clearFailKV(sbCfg, failKey);
+    // 【性能】清理结果不影响响应（失败也会按 expires_at 自然过期），
+    // 有 waitUntil 就异步收尾，不让访客多等一次往返。
+    const clearTask = clearFailKV(sbCfg, failKey).catch(() => {});
+    const ctx = (locals as any)?.runtime?.ctx;
+    if (ctx && typeof ctx.waitUntil === 'function') {
+      ctx.waitUntil(clearTask);
+    } else {
+      await clearTask;
+    }
     // 本地 dev 为 http，secure 需降级。密钥优先取 Cloudflare 运行时 Secret（locals.runtime.env），
     // 与签发/校验同源，保证 API 与 SSR 页面解出同一把密钥。
     cookies.set('unlocked', await makeUnlockCookieValue(base, runtimeEnv as any), {
