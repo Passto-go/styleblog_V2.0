@@ -9,11 +9,16 @@ import { useTranslations } from '../../i18n/ui.js';
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
-const posts = await getPosts(lang);
-const cats = await getCategories(lang);
+// 【性能】三个查询互不依赖，并行发出。
+// 原先三条 await 串行，每次 Supabase 往返 270～370ms（还有实例抖动），
+// 串行累加后首页 TTFB 实测 2.0～4.4s。并行后取最慢一条即可。
+// avatar：后台设置优先，未配置回退源码里的 /avatar.png
+const [posts, cats, avatar] = await Promise.all([
+  getPosts(lang),
+  getCategories(lang),
+  getAvatar(),
+]);
 const catMap = toCategoryMap(cats);
-// 头像：后台设置优先，未配置回退源码里的 /avatar.png
-const avatar = await getAvatar();
 ---
 <Base lang={lang} title={t('home.hero.title')} description={t('site.tagline')}>
   <div class="home">
