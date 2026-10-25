@@ -119,6 +119,10 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
   async function main() {
     const root = document.getElementById('comments');
     if (!root) return;
+    // 幂等守卫：hoisted 脚本可能因 HMR / Astro 实时推送被重新执行，
+    // 没有这层保护会重复绑定事件、重复创建订阅（实测曾放大到 400+ 条日志）。
+    if (root.dataset.inited === '1') return;
+    root.dataset.inited = '1';
     const page = root.dataset.page || '';
     const lang = root.dataset.lang || 'zh';
     const tRequired = root.dataset.required || '评论内容不能为空。';
@@ -438,9 +442,11 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
           }
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             if (!settled) {
-              // 首次就没连上：说明环境不支持实时推送，直接退订，避免自动重连
+              // 首次就没连上：说明环境不支持实时推送，直接退订并断开底层 WS，
+              // 避免 supabase-js 继续自动重连刷日志（removeChannel 只删 channel，不关连接）
               console.info('[comments] 实时推送不可用，改为手动刷新查看新评论（不影响评论功能）');
               try { supabase.removeChannel(channel); } catch (_) {}
+              try { supabase.realtime.disconnect(); } catch (_) {}
             }
             settled = true;
           }
