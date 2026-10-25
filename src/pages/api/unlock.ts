@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { makeUnlockCookieValue } from '../../lib/unlock.js';
 import { baseSlug } from '../../lib/posts.js';
+import { rateLimitKV } from '../../lib/api-guard.js';
 
 // 动态 API：运行在 Cloudflare Worker 上。任何人（已登录/未登录）都可尝试密码，
 // 但密码校验发生在 DB 端（post_check_password 用 pgcrypto 比对，pass_hash 不外泄），
@@ -16,12 +17,13 @@ function json(data: unknown, status = 200) {
 }
 
 /* ------------------------------------------------------------------ *
- * 暴力破解防护（两级，均为进程内存态）
+ * 暴力破解防护（三级）
  *   1) IP 维度：60s 内最多 10 次请求               → 防高频轰炸
  *   2) 文章维度：同一篇 10 分钟内最多错 5 次，       → 防换 IP 轮询撞同一篇
  *      触发后锁定 10 分钟（指数退避，上限 60 分钟）
- * 内存态不跨 Worker 实例共享（Cloudflare 边缘多 isolate），属「降低成功率」而非
- * 「绝对阻断」；如需强一致，后续可换 KV/Durable Object 或边缘 WAF 规则。
+ *   3) IP 维度同时写 KV（配了 RATE_LIMIT_KV 时跨 isolate 共享）→ M-01：
+ *      内存态不跨 Worker 实例共享，单靠内存基本形同虚设；上 KV 后强一致。
+ * 未配置 KV 时自动退回纯内存（行为与改造前一致，不会因缺配置而报错）。
  * ------------------------------------------------------------------ */
 const hits = new Map<string, number[]>();
 function rateLimit(key: string, max = 10, windowMs = 60_000): boolean {
@@ -89,7 +91,8 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       request.headers.get('cf-connecting-ip') ||
       request.headers.get('x-forwarded-for') ||
       'anon';
-    if (!rateLimit(`unlock:${ip}`)) {
+    const runtimeEnv = (locals as any)?.runtime?.env || {};
+    if (!(await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60)) || !rateLimit(`unlock:${ip}`)) {
       return json({ ok: false, code: 'too_many', error: '尝试过于频繁，请稍后再试' }, 429);
     }
 
@@ -169,8 +172,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     clearFail(failKey);
     // 本地 dev 为 http，secure 需降级。密钥优先取 Cloudflare 运行时 Secret（locals.runtime.env），
     // 与签发/校验同源，保证 API 与 SSR 页面解出同一把密钥。
-    const runtimeEnv = (locals as any).runtime?.env;
-    cookies.set('unlocked', await makeUnlockCookieValue(base, runtimeEnv), {
+    cookies.set('unlocked', await makeUnlockCookieValue(base, runtimeEnv as any), {
       httpOnly: true,
       secure: !import.meta.env.DEV,
       sameSite: 'lax',

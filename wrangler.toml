@@ -29,3 +29,12 @@ directory = "./dist"
 [vars]
 TRANSLATE_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 TRANSLATE_MODEL = "glm-4-flash"
+
+# 限流计数器（M-01）：绑定 KV 后，API 限流计数跨 Worker 实例共享才真正生效。
+# 创建命名空间：Cloudflare 后台 → Storage & Databases → KV → Create namespace，
+# 把返回的 id 填到下面；也可用命令行：
+#   npx wrangler kv namespace create RATE_LIMIT_KV
+# 不填（保持注释）时，代码自动退回「内存限流」——功能可用，但多 isolate 下会被绕过。
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "<替换为你的 KV namespace id>"

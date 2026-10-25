@@ -16,9 +16,16 @@ if (CONSTANT_SLUGS.has(category)) {
   if (Astro.url.pathname !== canonical) return Astro.redirect(canonical, 301);
 }
 
-// 只为「已注册分类」渲染；注册表里没有的 slug 一律 404，避免与常量页重复内链
-const cat = (await getCategories('en', { skipPosts: true }))
-  .find((c) => c.slug === category && c.fromRegistry) || null;
-if (!cat) Astro.response.status = 404;
+// 分类是否可渲染：
+//  ① 注册表里有的（后台「新增分类」登记的）→ 渲染
+//  ② 文章里有、但注册表没登记的历史分类 → 中文站本来就渲染，英文站此前直接 404，
+//     造成中英行为不一致（M-11）。这里按「该 slug 确实有英文文章」放行，与中文站对齐；
+//     真正不存在的 slug 仍然 404。
+const registered = (await getCategories('en', { skipPosts: true })).find(
+  (c) => c.slug === category && c.fromRegistry
+);
+const usable = registered || (await getCategories('en')).some((c) => c.slug === category && c.count > 0);
+
+if (!usable) Astro.response.status = 404;
 ---
-{cat ? <CategoryPage lang="en" slug={cat.slug} /> : <FourOhFour lang="en" />}
+{usable ? <CategoryPage lang="en" slug={category} /> : <FourOhFour lang="en" />}

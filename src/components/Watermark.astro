@@ -136,7 +136,10 @@ const mark = `${who} · ${date} · ${brand}`;
   .site-watermark {
     position: fixed;
     inset: 0;
-    z-index: 9998;
+    /* 必须低于所有交互浮层：分享二维码(130)、复制 toast(120)、抽屉(90)、
+       后台弹层(9999)、同意横幅(10000)。此前用 9998 会把二维码/
+       toast 压在灰纹下面，暗色模式尤其影响扫码（M-08）。 */
+    z-index: 1;
     pointer-events: none;       /* 不拦截任何点击 / 选中 */
     background-repeat: repeat;
   }

@@ -101,7 +101,7 @@ const consentParts = t('consent.text').split('{link}');
   .consent-banner {
     position: fixed;
     left: 0; right: 0; bottom: 0;
-    z-index: 9999;                 /* 高于水印（9998），保证可点击 */
+    z-index: 10000;                /* 仅高于水印与后台弹层；分享 toast(120)/二维码(130) 不再被压住（M-10） */
     background: var(--bg, #fff);
     border-top: 1px solid var(--border, #d0d7de);
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);

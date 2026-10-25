@@ -18,6 +18,8 @@
   /* 顶栏导航文字 / 图标（跟随主题，深色下保持可读对比度） */
   --nav-text: #4a5160;
   --icon-text: #6b7280;
+  /* 细线色（后台媒体选择器分隔线/边框，比 --border 更淡，避免大块面板显重） */
+  --line: #e6e9ee;
 }
 [data-theme="dark"] {
   --bg: #0d1117;
@@ -36,6 +38,7 @@
   --header-bg: rgba(13,17,23,.8);
   --nav-text: #c9d1d9;
   --icon-text: #9aa4b2;
+  --line: #2a3038;
 }
 * { box-sizing: border-box; }
 /* [hidden] 必须能压过组件里的 display 声明，否则「隐藏」元素仍占位显示 */
@@ -915,7 +918,7 @@ a { color: inherit; }
 
 /* ================= 文章页 ================= */
 /* 头部：简洁标题区（参考 tch.cool 文档风，无大图 hero） */
-.post-head { max-width: 1180px; margin: 30px auto 0; padding: 0 20px; }
+.post-head { max-width: var(--wrap); margin: 30px auto 0; padding: 0 20px; }
 .post-head-inner { max-width: 760px; }
 .post-title {
   color: var(--text-strong); font-size: clamp(26px, 4vw, 38px); font-weight: 700;
@@ -929,7 +932,7 @@ a { color: inherit; }
 .post-meta a.post-cat:hover { background: var(--accent-soft); border-color: var(--accent); }
 
 .post-layout {
-  max-width: 1360px; margin: 20px auto; padding: 0 20px;
+  max-width: var(--wrap); margin: 20px auto; padding: 0 20px;
   display: grid; grid-template-columns: 264px minmax(0,1fr); gap: 28px; align-items: start;
   grid-template-areas: "left main";
 }
@@ -984,7 +987,7 @@ a { color: inherit; }
 .reading-bar { position: fixed; top: 62px; left: 0; right: 0; height: 3px; background: transparent; z-index: 49; pointer-events: none; }
 .reading-bar-fill { height: 100%; width: 0; background: var(--accent); transition: width .08s linear; }
 /* 上一篇 / 下一篇 */
-.post-nav { max-width: 1360px; margin: 26px auto 0; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.post-nav { max-width: var(--wrap); margin: 26px auto 0; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .post-nav-item { display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; background: var(--surface); border: none; border-radius: var(--radius); text-decoration: none; transition: .18s; min-width: 0; }
 .post-nav-item.next { text-align: right; align-items: flex-end; }
 .post-nav-item:not(.disabled):hover { background: var(--bg-soft); }
