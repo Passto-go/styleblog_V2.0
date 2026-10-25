@@ -1,43 +1,61 @@
-// 临时诊断接口：确认 Cloudflare 运行时 env 中是否注入了绑定。
-// 只回显「存在哪些 key、类型是什么」，不泄露任何值。
+// 临时诊断接口：验证限流链路在哪一步断掉。
+// 只回显布尔值、计数、错误消息，不泄露密钥。
 // 验证完立刻删除本文件。
 import type { APIRoute } from 'astro';
+import { createClient } from '@supabase/supabase-js';
 
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async ({ locals, url }) => {
   const env = (locals as any)?.runtime?.env || {};
-  const keys = Object.keys(env).sort();
-  const detail: Record<string, string> = {};
-  for (const k of keys) {
-    const v = env[k];
-    if (v && typeof v === 'object') {
-      const methods = ['get', 'put', 'delete', 'list'].filter((m) => typeof v[m] === 'function');
-      detail[k] = methods.length ? `object{binding:${methods.join(',')}}` : 'object';
-    } else {
-      detail[k] = typeof v;
-    }
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+  const supabaseAnon = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+  const bucket = url.searchParams.get('bucket') || `diag:${Date.now()}`;
+  const out: any = {
+    step: {},
+  };
+
+  // 1) 构建期常量是否注入成功
+  out.step.envResolved = {
+    urlPresent: Boolean(supabaseUrl),
+    anonPresent: Boolean(supabaseAnon),
+    urlHost: supabaseUrl ? String(supabaseUrl).replace(/^https?:\/\//, '').split('/')[0] : null,
+    anonLen: supabaseAnon ? String(supabaseAnon).length : 0,
+  };
+
+  if (!supabaseUrl || !supabaseAnon) {
+    out.verdict = 'BUILD_ENV_MISSING';
+    return new Response(JSON.stringify(out, null, 2), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
   }
-  let kvProbe = 'no-binding';
-  const kv = env.RATE_LIMIT_KV;
-  if (kv && typeof kv.get === 'function') {
-    try {
-      const v = await kv.get('__diag_probe__');
-      kvProbe = v === null ? 'binding-ok(key-missing)' : 'binding-ok(key-present)';
-    } catch (e: any) {
-      kvProbe = 'binding-error: ' + (e?.message || String(e));
-    }
-  }
-  return new Response(
-    JSON.stringify(
-      {
-        envKeyCount: keys.length,
-        envKeys: keys,
-        detail,
-        kvProbe,
-        hasRuntime: Boolean((locals as any)?.runtime),
+
+  // 2) 直接调用 RPC，把完整错误抛出来
+  try {
+    const client = createClient(supabaseUrl, supabaseAnon, {
+      auth: { persistSession: false },
+      global: {
+        fetch: (u: RequestInfo | URL, i?: RequestInit) =>
+          fetch(u as any, { ...(i as any), signal: AbortSignal.timeout(4000) }),
       },
-      null,
-      2
-    ),
-    { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-  );
+    });
+    const { data, error } = await client.rpc('rate_limit_hit', {
+      p_bucket: bucket,
+      p_max: 3,
+      p_window_sec: 60,
+    });
+    out.step.rpc = error
+      ? { ok: false, message: error.message, code: (error as any).code, details: (error as any).details, hint: (error as any).hint }
+      : { ok: true, data };
+  } catch (e: any) {
+    out.step.rpc = { ok: false, threw: true, message: e?.message || String(e), name: e?.name };
+  }
+
+  // 3) 运行时 env 里是否有意外覆盖
+  out.step.runtimeEnvHasPublic =
+    Object.keys(env).filter((k) => k.startsWith('PUBLIC_'));
+  out.step.hasRuntime = Boolean((locals as any)?.runtime);
+
+  return new Response(JSON.stringify(out, null, 2), {
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
 };
