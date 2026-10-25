@@ -93,6 +93,12 @@ grant execute on function post_set_password(uuid, text, text, boolean) to anon, 
 grant execute on function post_set_list_visible(uuid, boolean) to anon, authenticated;
 grant execute on function post_clear_encryption(uuid) to anon, authenticated;
 
+-- H-02 修复：同上（teaser 迁移里的四参 post_set_password / post_set_list_visible / post_clear_encryption），
+-- 变更型 RPC 收回 anon 授权，仅留 authenticated。
+revoke execute on function post_set_password(uuid, text, text, boolean) from anon;
+revoke execute on function post_set_list_visible(uuid, boolean) from anon;
+revoke execute on function post_clear_encryption(uuid) from anon;
+
 -- 6) list_visible 不是敏感列（true/false 本身即前台行为），无需列级 revoke；
 --    应用侧显式列清单已包含它，与 is_encrypted / pass_hint 同等对待。
 

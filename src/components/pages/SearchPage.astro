@@ -1,7 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { useTranslations } from '../../i18n/ui.js';
-import { localizePath } from '../../i18n/ui.js';
 
 const { lang } = Astro.props;
 const t = useTranslations(lang);
@@ -55,18 +54,23 @@ const t = useTranslations(lang);
       }
       results.innerHTML = items
         .map(
-          (p) => `
+          (p) => {
+            // 条目自带 lang/slug（来自 getAllPostsEveryLang），直接拼出对应语言链接，
+            // 不再依赖仅在服务端可用的 localizePath（避免在浏览器侧抛 ReferenceError）。
+            const href = (p.lang === 'en' ? '/en/posts/' : '/posts/') + p.slug + '/';
+            return `
         <article class="card">
-          <a class="card-link" href="${localizePath('/posts/' + p.slug, lang)}">
+          <a class="card-link" href="${href}">
             <div class="card-body">
               <div class="card-meta"><time>${p.date}</time>${
-            p.category ? `<span class="cat-tag">${p.category}</span>` : ''
-          }</div>
+              p.category ? `<span class="cat-tag">${p.category}</span>` : ''
+            }</div>
               <h2>${p.title}</h2>
               ${p.excerpt ? `<p>${p.excerpt}</p>` : ''}
             </div>
           </a>
-        </article>`
+        </article>`;
+          }
         )
         .join('');
     }

@@ -108,11 +108,50 @@ grant execute on function post_check_password(text, text) to anon, authenticated
 grant execute on function post_set_password(uuid, text, text) to anon, authenticated;
 grant execute on function post_clear_encryption(uuid) to anon, authenticated;
 
+-- H-02 修复：变更型加密 RPC（设密/清密）不应对匿名开放。
+-- 任何人持公开 anon key 即可调用 post_clear_encryption(<id>) 解除他人文章加密、
+-- 或 post_set_password(<id>, ...) 改他人密码，结合 post_check_password 可完整绕过加密门禁。
+-- 收回 anon 授权；保留 authenticated（管理员后台登录后以该角色调用，不受影响）。
+revoke execute on function post_set_password(uuid, text, text) from anon;
+revoke execute on function post_clear_encryption(uuid) from anon;
+
 -- 5b) 列级收窄：哈希列对任何匿名/登录读者不可读。
 --     anon key 本就公开，不设防时 GET /rest/v1/posts?select=pass_hash 即可拖走
 --     全部哈希做离线爆破。service_role 与函数（security definer）不受影响。
 --     依赖：应用侧必须用显式列清单查 posts（已随代码改动），否则 select('*') 会报权限错。
 revoke select (pass_hash) on table public.posts from anon, authenticated;
+
+-- H-01 修复：解锁后由服务端取回加密正文（配合 posts_public 视图）。
+-- 非加密文直接返回；加密文仅当 p_token（cookie 值 base.signature）通过 HMAC 校验才返回，
+-- 否则返回空串。p_secret 仅由服务端传入（Cloudflare Secret / 构建变量），绝不进入客户端包；
+-- 攻击者缺密钥无法伪造 signature，故无法借此读取他人加密正文。函数以 definer 权限读取
+-- base 表 content（绕过对 anon 的 select 收回），且仅对 anon/authenticated 授权、可被服务端调用。
+create or replace function get_post_content(p_base text, p_token text, p_secret text)
+returns text
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_content text;
+  v_enc boolean;
+  v_sig text;
+  v_expected text;
+begin
+  select content, is_encrypted into v_content, v_enc
+  from posts
+  where regexp_replace(slug, '-(en|ja)$', '') = p_base
+    and published = true and deleted_at is null
+  limit 1;
+  if not v_enc then return v_content; end if;
+  if p_token is null or p_token = '' then return ''; end if;
+  v_sig := split_part(p_token, '.', 2);
+  select encode(hmac(convert_to(p_base, 'utf8'), convert_to(p_secret, 'utf8'), 'sha256'), 'hex')
+    into v_expected;
+  if v_sig = v_expected then return v_content; else return ''; end if;
+end;
+$$;
+grant execute on function get_post_content(text, text, text) to anon, authenticated;
 
 -- 6) 索引：按基准 slug 查加密文章时加速（可选，数据量小影响有限）
 create index if not exists posts_base_slug_enc_idx

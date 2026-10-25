@@ -27,8 +27,29 @@ function sbClient(extra) {
 const POST_COLS =
   'id,title,slug,content,excerpt,cover,published,published_at,created_at,lang,category,category_slug,author,deleted_at,is_encrypted,pass_hint,list_visible';
 
+// H-01 修复：解锁后由服务端取回加密正文。仅在文章已解锁（服务端已校验 cookie）后调用，
+// 经 get_post_content 安全 definer 函数读取；p_secret 为服务端持有的 UNLOCK_SECRET，
+// 绝不进入客户端包。任何未通过 HMAC 令牌校验的请求都拿不到正文。
+export async function getEncryptedContent(base, token, secret) {
+  if (!URL || !KEY || !secret) return '';
+  try {
+    const supabase = sbClient();
+    const { data, error } = await supabase.rpc('get_post_content', {
+      p_base: base,
+      p_token: token || '',
+      p_secret: secret,
+    });
+    if (error) {
+      console.error('[posts] get_post_content 错误:', error.message);
+      return '';
+    }
+    return data || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 // 构建时（服务端）从 Supabase 拉取已发布文章。
-// 未配置或拉取失败则回退到本地示例数据，保证站点始终能构建。
 async function fetchAll() {
   if (!URL || !KEY) {
     console.warn('[posts] 未检测到 Supabase 环境变量，使用本地示例数据。');
@@ -52,7 +73,9 @@ async function fetchAll() {
     [POST_COLS, false],
   ];
   for (const [cols, withTrash] of attempts) {
-    let q = supabase.from('posts').select(cols).eq('published', true);
+    // H-01 修复：经 posts_public 视图读取，加密行 content 已被脱敏为空串，
+    // 避免匿名直连 REST 读取加密正文明文（解锁后的真实正文走 getEncryptedContent）。
+    let q = supabase.from('posts_public').select(cols).eq('published', true);
     if (withTrash) q = q.is('deleted_at', null);
     const { data, error } = await q.order('published_at', { ascending: false });
     if (!error) return data ?? [];

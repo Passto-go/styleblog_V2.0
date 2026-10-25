@@ -1,8 +1,8 @@
-import { getAllPosts } from '../lib/posts.js';
+import { getAllPostsEveryLang } from '../lib/posts.js';
 import { formatDate } from '../lib/format.js';
 
 export async function GET() {
-  const posts = await getAllPosts();
+  const posts = await getAllPostsEveryLang();
   const items = posts.map((p) => ({
     slug: p.slug,
     title: p.title,

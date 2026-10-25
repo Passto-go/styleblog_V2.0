@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { makeUnlockCookieValue } from '../../lib/unlock.js';
+import { baseSlug } from '../../lib/posts.js';
 
 // 动态 API：运行在 Cloudflare Worker 上。任何人（已登录/未登录）都可尝试密码，
 // 但密码校验发生在 DB 端（post_check_password 用 pgcrypto 比对，pass_hash 不外泄），
@@ -50,7 +51,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     } catch {
       return json({ ok: false, error: '请求格式错误' }, 400);
     }
-    const base = String(body?.slug || '').trim();
+    const base = baseSlug(String(body?.slug || '').trim());
     const password = String(body?.password || '');
     if (!base || !password) {
       return json({ ok: false, error: '缺少必要参数' }, 400);

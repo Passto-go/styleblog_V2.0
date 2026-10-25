@@ -20,11 +20,17 @@ let warned = false;
 function resolveSecret(runtimeEnv?: Record<string, unknown>): string {
   const fromRuntime = runtimeEnv?.UNLOCK_SECRET;
   if (typeof fromRuntime === 'string' && fromRuntime) return fromRuntime;
-  if (!BUILD_SECRET && !warned) {
-    warned = true;
-    console.warn('[unlock] UNLOCK_SECRET 未配置，使用开发期固定密钥——生产环境务必在 Cloudflare 变量中设置');
+  if (BUILD_SECRET) return BUILD_SECRET;
+  // 生产环境缺失密钥：拒绝签发/校验解锁凭证，避免回退已知常量（dev-insecure）导致
+  // 任何人都可本地算出 HMAC 伪造解锁 cookie、绕过加密正文门禁。
+  if (import.meta.env.DEV) {
+    if (!warned) {
+      warned = true;
+      console.warn('[unlock] DEV 模式：UNLOCK_SECRET 未配置，使用开发期固定密钥（仅本地，请勿用于生产）');
+    }
+    return 'dev-insecure';
   }
-  return BUILD_SECRET || 'dev-insecure';
+  throw new Error('UNLOCK_SECRET 未配置：生产环境拒绝签发/校验解锁凭证，以防止解锁 cookie 被伪造');
 }
 
 // HMAC-SHA256(base, secret) → 小写 hex

@@ -24,6 +24,22 @@ create policy "public read published"
   on posts for select
   using (published = true);
 
+-- H-01 修复：加密正文经视图脱敏，杜绝「匿名直连 REST 读明文」的漏洞。
+-- 视图对加密行将 content 脱敏为空串（标题/摘要仍可见，teaser 模式不受影响），
+-- 非加密行原样返回；真正的加密正文仅经 get_post_content（见 encryption.sql）在
+-- 解锁后由服务端取回。读者端只经本视图读取，base 表对 anon 收回直读。
+drop view if exists posts_public;
+create view posts_public as
+  select
+    id, title, slug, excerpt, cover, published, published_at, created_at,
+    lang, category, category_slug, author, deleted_at, is_encrypted, pass_hint, list_visible,
+    case when is_encrypted then '' else content end as content
+  from posts;
+grant select on posts_public to anon, authenticated;
+-- 仅收回 anon 对 base 表的直读（攻击者可借公开 anon key 读 content）；
+-- authenticated（管理员后台）仍可读 base 表，便于编辑；写策略不受影响。
+revoke select on posts from anon;
+
 -- 写作者端：已登录用户可读写全部
 drop policy if exists "authenticated write" on posts;
 create policy "authenticated write"
