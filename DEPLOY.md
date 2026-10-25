@@ -66,13 +66,25 @@
 
 ```toml
 name = "mystyle"                 # 必须与 Dashboard 项目名完全一致
-main = "dist/_worker.js/index.js"
+# Astro 7 + @astrojs/cloudflare v14：main 用适配器统一入口，不要写构建产物路径！
+# 旧值 "dist/_worker.js/index.js" 指向构建后才生成的文件，Cloudflare 在解析配置
+# 阶段就找不到该文件 → 构建 0 秒即失败（报错 main field doesn't point to an existing file）。
+main = "@astrojs/cloudflare/entrypoints/server"
 compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "./dist"
 ```
+
+> ⚠️ **`main` 是发布点，不是产物路径（2026-10 踩坑复盘）**：旧 `wrangler.toml` 写
+> `main = "dist/_worker.js/index.js"`，该文件要在 `npm run build` 之后才存在。Cloudflare
+> 在**读取配置阶段**就会校验该路径，文件尚不存在直接报 `main field doesn't point to an existing file`，
+> 构建 0 秒失败（GitHub Checks 显示 `Workers Builds: mystyle failed in 0s`）。
+> 升级到 Astro 7 + adapter 14 后改用适配器统一入口 `main = "@astrojs/cloudflare/entrypoints/server"`
+> （不以 `.js` 结尾，vite-plugin 不再要求文件预先存在），构建才正常。
+> 配套：`astro.config.mjs` 的 adapter 需设 `prerenderEnvironment: 'node'`（worker 预渲染在沙箱/部分 CI 跑不起 workerd，会 ECONNREFUSED）。
+> **改 `wrangler.toml` 或 `astro.config.mjs` 后必须 Retry deployment / 重新 push 才生效。**
 
 - `nodejs_compat`：SSR 依赖 Node 兼容层，缺它 Worker 里任何 Node 内建调用会直接 500。
 - **不要**加 `disable_nodejs_process_v2`：本地 wrangler 3.x 运行时不识别该标志会启动失败。
@@ -146,6 +158,7 @@ directory = "./dist"
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | 构建失败，日志提到 `Workers-specific command in a Pages project` | `wrangler.toml` 是 Pages 格式但 Deploy command 是 `npx wrangler deploy` | 用本文的 Workers 格式 `wrangler.toml`（已修复） |
+| 构建 0 秒失败，Checks 显示 `Workers Builds: mystyle failed in 0s`，或日志 `main field doesn't point to an existing file` | `wrangler.toml` 的 `main` 指向构建产物路径（如 `dist/_worker.js/index.js`），Cloudflare 在**读配置阶段**就找不到该文件，构建根本没启动 | 把 `main` 改为适配器统一入口 `@astrojs/cloudflare/entrypoints/server`（Astro 7 + adapter 14 标准写法），并保证 `astro.config.mjs` 的 adapter 设了 `prerenderEnvironment: 'node'`；改完 Retry deployment（见上方 ⚠️ 复盘） |
 | 全站 500，日志提到 Node 内建模块 | 缺 nodejs_compat | `wrangler.toml` 已带；确认仓库根目录有该文件 |
 | 线上只显示示例文章、后台读不到数据 | 没加 `PUBLIC_*` 构建变量 | 在 Settings → Builds → Build environment variables 补齐后 Retry deployment |
 | 文章发布了但页面没有 | 几乎不可能（无构建环节）；先确认 `published=true` | 访问 `/search-index.json` 看文章在不在 |
