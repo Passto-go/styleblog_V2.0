@@ -72,7 +72,8 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       return json({ ok: false, error: '验证服务异常，请稍后重试' }, 500);
     }
     if (!data) {
-      return json({ ok: false, error: '密码错误' }, 401);
+      // 附带 code 供前端按语言本地化提示（API 默认中文，英文页需客户端映射为其翻译）
+      return json({ ok: false, code: 'wrong_password', error: '密码错误' }, 401);
     }
 
     // 校验通过：签发签名 cookie（base.signature）。本地 dev 为 http，secure 需降级。

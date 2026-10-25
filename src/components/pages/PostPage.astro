@@ -247,7 +247,8 @@ const missingNotice = (() => {
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d.ok) { location.reload(); return; }
-          msg.textContent = d.error || unlockWrong;
+          // 密码错误按当前页面语言显示对应文案（API 默认返回中文，英文页映射为翻译）
+          msg.textContent = d.code === 'wrong_password' ? unlockWrong : (d.error || unlockWrong);
           msg.classList.add('post-lock-msg-err');
         })
         .catch(function () { msg.textContent = unlockNetErr; msg.classList.add('post-lock-msg-err'); });
