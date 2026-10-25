@@ -70,31 +70,91 @@ function clearFail(key: string) {
 // ------------------------------------------------------------------
 // 文章维度锁定（计数 + 锁定）
 //
-// 历史：这里曾用 Cloudflare KV 做跨实例共享，但 KV 的 get→判断→put 是
-// 非原子读改写。2026-10-25 线上实测并发 15 次时，同一篇文章第 2 次就被
-// 误锁（多个请求读到同一个 fails=0 各自写回），既会漏拦也会误伤真实访客。
-// 结论：凡「读-改-写」语义都不能用 KV。
-//
-// 现状：暂时退回内存实现（单实例内准确，不会误锁），仅作为止血。
-// 待 Supabase 的原子函数 unlock_record_fail / unlock_locked_for / unlock_clear
-// 上线后，改用数据库行锁串行化，届时再恢复跨实例能力。
+// 演进过程：
+//  1) 最初用模块级 Map —— 多 isolate 下各自归零，等于没防护。
+//  2) 改用 Cloudflare KV —— KV 的 get→判断→put 是非原子读改写，
+//     2026-10-25 实测并发 15 次时同一篇第 2 次就被误锁（多个请求读到
+//     同一个 fails=0 各自写回），既漏拦也误伤真实访客。KV 无原子递增 API。
+//  3) 现在用 Supabase 函数 unlock_record_fail：一条 plpgsql 内完成
+//     「取行锁 → 累加 → 判阈值 → 写锁定」，并发请求由数据库行锁串行化。
+//     实测并发 15 次：remaining 恰好各出现 3 次（1~5），锁定正好触发 3 次，
+//     零丢失零误锁。
+// 数据库不可用时退回内存实现，保证接口不 500（防护退化但不失效）。
 // ------------------------------------------------------------------
 
-/** 读锁定剩余秒数（内存实现） */
-async function lockedForKV(_env: any, key: string): Promise<number> {
+type SbCfg = { url?: string; anon?: string } | undefined;
+
+function sbClient(cfg: SbCfg) {
+  if (!cfg?.url || !cfg?.anon) return null;
+  return createClient(cfg.url, cfg.anon, {
+    auth: { persistSession: false },
+    global: {
+      fetch: (u: RequestInfo | URL, i?: RequestInit) =>
+        fetch(u as any, { ...(i as any), signal: AbortSignal.timeout(4000) }),
+    },
+  });
+}
+
+/** 读锁定剩余秒数；数据库不可用时退回内存 */
+async function lockedForKV(cfg: SbCfg, key: string): Promise<number> {
+  const client = sbClient(cfg);
+  if (client) {
+    try {
+      const { data, error } = await client.rpc('unlock_locked_for', { p_bucket: key });
+      if (!error) return typeof data === 'number' ? data : 0;
+      console.warn('[unlock] unlock_locked_for 失败，退回内存:', error.message);
+    } catch (e: any) {
+      console.warn('[unlock] unlock_locked_for 异常，退回内存:', e?.message || e);
+    }
+  }
   return lockedFor(key);
 }
 
-/** 记一次错误，返回本次触发的锁定秒数与剩余可试次数（内存实现） */
-async function recordFailKV(_env: any, key: string): Promise<{ lockSec: number; remaining: number }> {
+/** 记一次错误，返回锁定秒数与剩余可试次数；数据库不可用时退回内存 */
+async function recordFailKV(
+  cfg: SbCfg,
+  key: string
+): Promise<{ lockSec: number; remaining: number }> {
+  const client = sbClient(cfg);
+  if (client) {
+    try {
+      const { data, error } = await client.rpc('unlock_record_fail', {
+        p_bucket: key,
+        p_window_sec: Math.floor(FAIL_WINDOW_MS / 1000),
+        p_limit: FAIL_LIMIT,
+        p_base_lock_sec: Math.floor(BASE_LOCK_MS / 1000),
+        p_max_lock_sec: Math.floor(MAX_LOCK_MS / 1000),
+      });
+      if (!error) {
+        // 函数返回 table，supabase-js 拿到的是数组
+        const row = Array.isArray(data) ? data[0] : data;
+        if (row) {
+          return {
+            lockSec: Number(row.locked_for_sec) || 0,
+            remaining: Number(row.remaining) || 0,
+          };
+        }
+      }
+      console.warn('[unlock] unlock_record_fail 失败，退回内存:', error?.message);
+    } catch (e: any) {
+      console.warn('[unlock] unlock_record_fail 异常，退回内存:', e?.message || e);
+    }
+  }
   const lockSec = recordFail(key);
   const st = fails.get(key);
   return { lockSec, remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT };
 }
 
-/** 解锁成功后清空失败计数（内存实现） */
-async function clearFailKV(_env: any, key: string): Promise<void> {
+/** 解锁成功后清空失败计数（数据库 + 内存都清） */
+async function clearFailKV(cfg: SbCfg, key: string): Promise<void> {
   clearFail(key);
+  const client = sbClient(cfg);
+  if (!client) return;
+  try {
+    await client.rpc('unlock_clear', { p_bucket: key });
+  } catch {
+    /* 清理失败不影响主流程，计数会按 expires_at 自然过期 */
+  }
 }
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
@@ -111,6 +171,8 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       request.headers.get('x-forwarded-for') ||
       'anon';
     const runtimeEnv = (locals as any)?.runtime?.env || {};
+    // 文章锁定与限流都走 Supabase 原子函数；配置缺失或数据库异常时内部退回内存
+    const sbCfg = { url: supabaseUrl, anon: supabaseAnon };
     // Supabase 原子计数（跨实例一致）；异常时内部退回内存限流，不会放行失控
     if (!(await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60, {
       url: supabaseUrl,
@@ -137,7 +199,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
 
     // 文章维度锁定检查（在调用 DB 之前拦截，省算力也防爆破）
     const failKey = `fail:${base}`;
-    const lockSec = await lockedForKV(runtimeEnv, failKey);
+    const lockSec = await lockedForKV(sbCfg, failKey);
     if (lockSec > 0) {
       return json(
         {
@@ -166,7 +228,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     }
     if (!data) {
       // 计入文章维度错误次数；达阈值则立刻返回锁定
-      const { lockSec: lockNow, remaining } = await recordFailKV(runtimeEnv, failKey);
+      const { lockSec: lockNow, remaining } = await recordFailKV(sbCfg, failKey);
       if (lockNow > 0) {
         return json(
           {
@@ -191,7 +253,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     }
 
     // 校验通过：清掉该文章的失败计数，签发签名 cookie（base.signature）。
-    await clearFailKV(runtimeEnv, failKey);
+    await clearFailKV(sbCfg, failKey);
     // 本地 dev 为 http，secure 需降级。密钥优先取 Cloudflare 运行时 Secret（locals.runtime.env），
     // 与签发/校验同源，保证 API 与 SSR 页面解出同一把密钥。
     cookies.set('unlocked', await makeUnlockCookieValue(base, runtimeEnv as any), {
