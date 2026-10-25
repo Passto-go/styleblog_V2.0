@@ -21,23 +21,12 @@ function json(data: unknown, status = 200) {
  *   1) IP 维度：60s 内最多 10 次请求               → 防高频轰炸
  *   2) 文章维度：同一篇 10 分钟内最多错 5 次，       → 防换 IP 轮询撞同一篇
  *      触发后锁定 10 分钟（指数退避，上限 60 分钟）
- *   3) IP 维度同时写 KV（配了 RATE_LIMIT_KV 时跨 isolate 共享）→ M-01：
- *      内存态不跨 Worker 实例共享，单靠内存基本形同虚设；上 KV 后强一致。
- * 未配置 KV 时自动退回纯内存（行为与改造前一致，不会因缺配置而报错）。
+ *   3) IP 维度计数存 Supabase（rate_limit_hit RPC，单条 UPSERT 原子递增）
+ *      → 跨 Worker 实例强一致。
+ *      此前用 Cloudflare KV 实测失败：KV 没有原子递增，get→+1→put 在并发下
+ *      互相覆盖，且写入有传播延迟会让 429 闪断，因此改用 Postgres。
+ * Supabase 不可用时自动退回纯内存（行为与改造前一致，不会因故障而报错）。
  * ------------------------------------------------------------------ */
-const hits = new Map<string, number[]>();
-function rateLimit(key: string, max = 10, windowMs = 60_000): boolean {
-  const now = Date.now();
-  const arr = (hits.get(key) || []).filter((t) => now - t < windowMs);
-  if (arr.length >= max) {
-    hits.set(key, arr);
-    return false;
-  }
-  arr.push(now);
-  hits.set(key, arr);
-  return true;
-}
-
 type FailState = { fails: number; firstFail: number; lockedUntil: number };
 const fails = new Map<string, FailState>();
 const FAIL_WINDOW_MS = 10 * 60_000; // 统计窗口
@@ -166,7 +155,11 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       request.headers.get('x-forwarded-for') ||
       'anon';
     const runtimeEnv = (locals as any)?.runtime?.env || {};
-    if (!(await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60)) || !rateLimit(`unlock:${ip}`)) {
+    // Supabase 原子计数（跨实例一致）；异常时内部退回内存限流，不会放行失控
+    if (!(await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60, {
+      url: supabaseUrl,
+      anon: supabaseAnon,
+    }))) {
       return json({ ok: false, code: 'too_many', error: '尝试过于频繁，请稍后再试' }, 429);
     }
 

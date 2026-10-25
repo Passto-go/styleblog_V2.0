@@ -44,27 +44,41 @@ export function memRateLimit(key: string, max: number, windowMs: number): boolea
 }
 
 /**
- * 跨实例限流：优先用 KV（强一致），没有则退化为内存。
+ * 跨实例限流：Supabase 原子计数，跨 Worker 实例强一致。
  * @returns true = 放行
+ *
+ * 为什么不再用 KV（2026-10-25 实测结论）：
+ *   KV 的 get→+1→put 是非原子读改写，且写入有几十秒全球传播延迟。
+ *   实测 14 个并发请求全部读到同一个旧值、各自写回 1，计数永远不涨；
+ *   串行请求还会出现 429 闪断（读到未传播的旧值）。KV 无原子递增 API，
+ *   官方也不建议用它做计数器。改用 Postgres 的单条 UPSERT 实现原子递增。
  */
 export async function rateLimitKV(
   env: any,
   key: string,
   max: number,
-  windowSec: number
+  windowSec: number,
+  supabase?: { url: string; anon: string }
 ): Promise<boolean> {
-  const kv = env?.RATE_LIMIT_KV;
-  if (kv && typeof kv.get === 'function') {
+  // 优先走 Supabase 原子计数
+  if (supabase?.url && supabase?.anon) {
     try {
-      const cur = Number((await kv.get(key)) || 0);
-      if (cur >= max) return false;
-      // KV 的最小过期粒度是 60s，窗口小于 60s 时按 60s 计（宁可稍宽，不误伤）
-      const ttl = Math.max(60, windowSec);
-      await kv.put(key, String(cur + 1), { expirationTtl: ttl });
-      return true;
+      const client = createClient(supabase.url, supabase.anon, {
+        auth: { persistSession: false },
+        global: {
+          fetch: (u: RequestInfo | URL, i?: RequestInit) =>
+            fetch(u as any, { ...(i as any), signal: AbortSignal.timeout(4000) }),
+        },
+      });
+      const { data, error } = await client.rpc('rate_limit_hit', {
+        p_bucket: key,
+        p_max: max,
+        p_window_sec: windowSec,
+      });
+      if (!error) return data === true;
+      console.warn('[rate-limit] RPC 失败，退回内存限流:', error.message);
     } catch (e: any) {
-      // KV 异常时不阻断业务，退回内存限流
-      console.warn('[rate-limit] KV 读写失败，退回内存限流:', e?.message || e);
+      console.warn('[rate-limit] RPC 异常，退回内存限流:', e?.message || e);
     }
   }
   return memRateLimit(key, max, windowSec * 1000);

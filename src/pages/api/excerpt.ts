@@ -24,8 +24,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!guard.ok) return guard.response;
     const userId = guard.userId;
 
-    // 2. 限流：配了 RATE_LIMIT_KV 则跨 isolate 强一致，否则内存兜底（M-01 / L-11）
-    if (!(await rateLimitKV(runtimeEnv, `ai:${userId}`, 8, 60))) {
+    // 2. 限流：走 Supabase 原子计数（跨实例一致），异常时退回内存兜底（M-01 / L-11）
+    if (!(await rateLimitKV(runtimeEnv, `ai:${userId}`, 8, 60, {
+      url: (import.meta as any).env.PUBLIC_SUPABASE_URL,
+      anon: (import.meta as any).env.PUBLIC_SUPABASE_ANON_KEY,
+    }))) {
       return json({ error: '操作太频繁，请一分钟后重试' }, 429);
     }
 
