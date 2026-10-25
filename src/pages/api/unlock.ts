@@ -45,7 +45,7 @@ const FAIL_LIMIT = 5; // 窗口内允许的错误次数
 const BASE_LOCK_MS = 10 * 60_000; // 首次锁定时长
 const MAX_LOCK_MS = 60 * 60_000; // 锁定上限
 
-/** 返回剩余锁定秒数，0 表示未锁定 */
+/** 返回剩余锁定秒数，0 表示未锁定（内存兜底路径） */
 function lockedFor(key: string): number {
   const s = fails.get(key);
   if (!s) return 0;
@@ -76,6 +76,80 @@ function recordFail(key: string): number {
 
 function clearFail(key: string) {
   fails.delete(key);
+}
+
+// ---- 文章维度锁定：跨实例版本（KV 优先，内存兜底）----
+// 上面的 Map 只在单 isolate 内有效，Worker 多实例下计数器各自归零，
+// 表现为 remaining 在 4/3 之间来回跳、永远打不到锁定阈值。
+// 配了 RATE_LIMIT_KV 时把状态放 KV，key 带 TTL，过期自动回收。
+const FAIL_KV_TTL = Math.ceil(MAX_LOCK_MS / 1000) + 60;
+
+function kvOf(env: any) {
+  const kv = env?.RATE_LIMIT_KV;
+  return kv && typeof kv.get === 'function' ? kv : null;
+}
+
+/** 读 KV 里的锁定剩余秒数；无 KV 时退回内存 */
+async function lockedForKV(env: any, key: string): Promise<number> {
+  const kv = kvOf(env);
+  if (!kv) return lockedFor(key);
+  try {
+    const raw = await kv.get(key);
+    if (!raw) return 0;
+    const st = JSON.parse(raw) as FailState;
+    const left = st.lockedUntil - Date.now();
+    return left > 0 ? Math.ceil(left / 1000) : 0;
+  } catch {
+    return lockedFor(key); // KV 异常时不让防护失效，退回内存判断
+  }
+}
+
+/** 记一次错误，返回本次触发的锁定秒数与剩余可试次数；无 KV 时退回内存 */
+async function recordFailKV(env: any, key: string): Promise<{ lockSec: number; remaining: number }> {
+  const kv = kvOf(env);
+  if (!kv) {
+    const lockSec = recordFail(key);
+    const st = fails.get(key);
+    return { lockSec, remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT };
+  }
+  const now = Date.now();
+  try {
+    const raw = await kv.get(key);
+    let s: FailState = raw ? JSON.parse(raw) : { fails: 0, firstFail: now, lockedUntil: 0 };
+    if (!s.firstFail || now - s.firstFail > FAIL_WINDOW_MS) {
+      s = { fails: 0, firstFail: now, lockedUntil: 0 };
+    }
+    s.fails += 1;
+    let lockSec = 0;
+    if (s.fails >= FAIL_LIMIT) {
+      const round = Math.floor(s.fails / FAIL_LIMIT) - 1;
+      const lockMs = Math.min(BASE_LOCK_MS * Math.pow(2, Math.max(0, round)), MAX_LOCK_MS);
+      s.lockedUntil = now + lockMs;
+      s.fails = 0;
+      s.firstFail = now;
+      lockSec = Math.ceil(lockMs / 1000);
+    }
+    await kv.put(key, JSON.stringify(s), { expirationTtl: FAIL_KV_TTL });
+    // 双写内存：KV 万一读失败时本实例还有一份近距离状态
+    fails.set(key, s);
+    return { lockSec, remaining: Math.max(0, FAIL_LIMIT - s.fails) };
+  } catch {
+    const lockSec = recordFail(key);
+    const st = fails.get(key);
+    return { lockSec, remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT };
+  }
+}
+
+/** 解锁成功后清空失败计数；无 KV 时退回内存 */
+async function clearFailKV(env: any, key: string): Promise<void> {
+  clearFail(key);
+  const kv = kvOf(env);
+  if (!kv) return;
+  try {
+    await kv.delete(key);
+  } catch {
+    /* 清理失败不影响主流程，计数会按 TTL 自然过期 */
+  }
 }
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
@@ -114,7 +188,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
 
     // 文章维度锁定检查（在调用 DB 之前拦截，省算力也防爆破）
     const failKey = `fail:${base}`;
-    const lockSec = lockedFor(failKey);
+    const lockSec = await lockedForKV(runtimeEnv, failKey);
     if (lockSec > 0) {
       return json(
         {
@@ -143,7 +217,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     }
     if (!data) {
       // 计入文章维度错误次数；达阈值则立刻返回锁定
-      const lockNow = recordFail(failKey);
+      const { lockSec: lockNow, remaining } = await recordFailKV(runtimeEnv, failKey);
       if (lockNow > 0) {
         return json(
           {
@@ -156,12 +230,11 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         );
       }
       // 附带 code 供前端按语言本地化提示（API 默认中文，英文页需客户端映射为其翻译）
-      const st = fails.get(failKey);
       return json(
         {
           ok: false,
           code: 'wrong_password',
-          remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT,
+          remaining,
           error: '密码错误',
         },
         401
@@ -169,7 +242,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     }
 
     // 校验通过：清掉该文章的失败计数，签发签名 cookie（base.signature）。
-    clearFail(failKey);
+    await clearFailKV(runtimeEnv, failKey);
     // 本地 dev 为 http，secure 需降级。密钥优先取 Cloudflare 运行时 Secret（locals.runtime.env），
     // 与签发/校验同源，保证 API 与 SSR 页面解出同一把密钥。
     cookies.set('unlocked', await makeUnlockCookieValue(base, runtimeEnv as any), {
