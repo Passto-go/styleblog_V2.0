@@ -53,12 +53,15 @@ export function memRateLimit(key: string, max: number, windowMs: number): boolea
  *   串行请求还会出现 429 闪断（读到未传播的旧值）。KV 无原子递增 API，
  *   官方也不建议用它做计数器。改用 Postgres 的单条 UPSERT 实现原子递增。
  */
+export type RateLimitTrace = { path: 'db' | 'mem' | 'no-cfg'; err?: string };
+
 export async function rateLimitKV(
   env: any,
   key: string,
   max: number,
   windowSec: number,
-  supabase?: { url: string; anon: string }
+  supabase?: { url: string; anon: string },
+  trace?: RateLimitTrace
 ): Promise<boolean> {
   // 优先走 Supabase 原子计数
   if (supabase?.url && supabase?.anon) {
@@ -75,12 +78,18 @@ export async function rateLimitKV(
         p_max: max,
         p_window_sec: windowSec,
       });
+      if (trace) trace.path = 'db';
       if (!error) return data === true;
+      if (trace) trace.err = error.message;
       console.warn('[rate-limit] RPC 失败，退回内存限流:', error.message);
     } catch (e: any) {
+      if (trace) trace.err = e?.message || String(e);
       console.warn('[rate-limit] RPC 异常，退回内存限流:', e?.message || e);
     }
+  } else if (trace) {
+    trace.path = 'no-cfg';
   }
+  if (trace && !trace.path) trace.path = 'mem';
   return memRateLimit(key, max, windowSec * 1000);
 }
 

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { makeUnlockCookieValue } from '../../lib/unlock.js';
 import { baseSlug } from '../../lib/posts.js';
-import { rateLimitKV } from '../../lib/api-guard.js';
+import { rateLimitKV, type RateLimitTrace } from '../../lib/api-guard.js';
 
 // 动态 API：运行在 Cloudflare Worker 上。任何人（已登录/未登录）都可尝试密码，
 // 但密码校验发生在 DB 端（post_check_password 用 pgcrypto 比对，pass_hash 不外泄），
@@ -174,11 +174,16 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     // 文章锁定与限流都走 Supabase 原子函数；配置缺失或数据库异常时内部退回内存
     const sbCfg = { url: supabaseUrl, anon: supabaseAnon };
     // Supabase 原子计数（跨实例一致）；异常时内部退回内存限流，不会放行失控
-    if (!(await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60, {
+    const rlTrace: RateLimitTrace = { path: 'db' };
+    const rlOk = await rateLimitKV(runtimeEnv, `rl:unlock:ip:${ip}`, 10, 60, {
       url: supabaseUrl,
       anon: supabaseAnon,
-    }))) {
-      return json({ ok: false, code: 'too_many', error: '尝试过于频繁，请稍后再试' }, 429);
+    }, rlTrace);
+    if (!rlOk) {
+      const r = json({ ok: false, code: 'too_many', error: '尝试过于频繁，请稍后再试' }, 429);
+      r.headers.set('x-rl-path', rlTrace.path);
+      r.headers.set('x-rl-ip', ip);
+      return r;
     }
 
     let body: any;
