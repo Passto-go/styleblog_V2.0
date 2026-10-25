@@ -67,78 +67,34 @@ function clearFail(key: string) {
   fails.delete(key);
 }
 
-// ---- 文章维度锁定：跨实例版本（KV 优先，内存兜底）----
-// 上面的 Map 只在单 isolate 内有效，Worker 多实例下计数器各自归零，
-// 表现为 remaining 在 4/3 之间来回跳、永远打不到锁定阈值。
-// 配了 RATE_LIMIT_KV 时把状态放 KV，key 带 TTL，过期自动回收。
-const FAIL_KV_TTL = Math.ceil(MAX_LOCK_MS / 1000) + 60;
+// ------------------------------------------------------------------
+// 文章维度锁定（计数 + 锁定）
+//
+// 历史：这里曾用 Cloudflare KV 做跨实例共享，但 KV 的 get→判断→put 是
+// 非原子读改写。2026-10-25 线上实测并发 15 次时，同一篇文章第 2 次就被
+// 误锁（多个请求读到同一个 fails=0 各自写回），既会漏拦也会误伤真实访客。
+// 结论：凡「读-改-写」语义都不能用 KV。
+//
+// 现状：暂时退回内存实现（单实例内准确，不会误锁），仅作为止血。
+// 待 Supabase 的原子函数 unlock_record_fail / unlock_locked_for / unlock_clear
+// 上线后，改用数据库行锁串行化，届时再恢复跨实例能力。
+// ------------------------------------------------------------------
 
-function kvOf(env: any) {
-  const kv = env?.RATE_LIMIT_KV;
-  return kv && typeof kv.get === 'function' ? kv : null;
+/** 读锁定剩余秒数（内存实现） */
+async function lockedForKV(_env: any, key: string): Promise<number> {
+  return lockedFor(key);
 }
 
-/** 读 KV 里的锁定剩余秒数；无 KV 时退回内存 */
-async function lockedForKV(env: any, key: string): Promise<number> {
-  const kv = kvOf(env);
-  if (!kv) return lockedFor(key);
-  try {
-    const raw = await kv.get(key);
-    if (!raw) return 0;
-    const st = JSON.parse(raw) as FailState;
-    const left = st.lockedUntil - Date.now();
-    return left > 0 ? Math.ceil(left / 1000) : 0;
-  } catch {
-    return lockedFor(key); // KV 异常时不让防护失效，退回内存判断
-  }
+/** 记一次错误，返回本次触发的锁定秒数与剩余可试次数（内存实现） */
+async function recordFailKV(_env: any, key: string): Promise<{ lockSec: number; remaining: number }> {
+  const lockSec = recordFail(key);
+  const st = fails.get(key);
+  return { lockSec, remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT };
 }
 
-/** 记一次错误，返回本次触发的锁定秒数与剩余可试次数；无 KV 时退回内存 */
-async function recordFailKV(env: any, key: string): Promise<{ lockSec: number; remaining: number }> {
-  const kv = kvOf(env);
-  if (!kv) {
-    const lockSec = recordFail(key);
-    const st = fails.get(key);
-    return { lockSec, remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT };
-  }
-  const now = Date.now();
-  try {
-    const raw = await kv.get(key);
-    let s: FailState = raw ? JSON.parse(raw) : { fails: 0, firstFail: now, lockedUntil: 0 };
-    if (!s.firstFail || now - s.firstFail > FAIL_WINDOW_MS) {
-      s = { fails: 0, firstFail: now, lockedUntil: 0 };
-    }
-    s.fails += 1;
-    let lockSec = 0;
-    if (s.fails >= FAIL_LIMIT) {
-      const round = Math.floor(s.fails / FAIL_LIMIT) - 1;
-      const lockMs = Math.min(BASE_LOCK_MS * Math.pow(2, Math.max(0, round)), MAX_LOCK_MS);
-      s.lockedUntil = now + lockMs;
-      s.fails = 0;
-      s.firstFail = now;
-      lockSec = Math.ceil(lockMs / 1000);
-    }
-    await kv.put(key, JSON.stringify(s), { expirationTtl: FAIL_KV_TTL });
-    // 双写内存：KV 万一读失败时本实例还有一份近距离状态
-    fails.set(key, s);
-    return { lockSec, remaining: Math.max(0, FAIL_LIMIT - s.fails) };
-  } catch {
-    const lockSec = recordFail(key);
-    const st = fails.get(key);
-    return { lockSec, remaining: st ? Math.max(0, FAIL_LIMIT - st.fails) : FAIL_LIMIT };
-  }
-}
-
-/** 解锁成功后清空失败计数；无 KV 时退回内存 */
-async function clearFailKV(env: any, key: string): Promise<void> {
+/** 解锁成功后清空失败计数（内存实现） */
+async function clearFailKV(_env: any, key: string): Promise<void> {
   clearFail(key);
-  const kv = kvOf(env);
-  if (!kv) return;
-  try {
-    await kv.delete(key);
-  } catch {
-    /* 清理失败不影响主流程，计数会按 TTL 自然过期 */
-  }
 }
 
 export const POST: APIRoute = async ({ request, cookies, locals }) => {
