@@ -447,10 +447,14 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
           if (root.dataset.realtime === 'down') return;
           root.dataset.realtime = 'down';
           // 首次就没连上：说明当前环境不支持实时推送，退订后不再重试。
-          // 注意这里只 removeChannel，不调 realtime.disconnect()——
-          // 后者会让底层连接进入关闭流程，反而再触发一轮状态回调。
+          // 只 removeChannel，不额外调 realtime.disconnect()：SDK 在 channel
+          // 清空后会自动安排断开，手动再断反而多触发一轮状态回调。
+          // removeChannel 是 async，必须接住 Promise，否则断开会被推迟，
+          // 底层连接仍会按退避策略再重连几次。
           console.info('[comments] 实时推送不可用，改为手动刷新查看新评论（不影响评论功能）');
-          try { supabase.removeChannel(sub); } catch (_) {}
+          Promise.resolve()
+            .then(() => supabase.removeChannel(sub))
+            .catch(() => {});
         });
     } catch (e) {
       console.info('[comments] 实时订阅已跳过（不影响评论功能）', e);
