@@ -85,6 +85,8 @@ export const ui = {
     'post.unlock': '解锁',
     'post.unlockWrong': '密码错误，请重试',
     'post.unlockNetErr': '网络错误，请稍后重试',
+    'post.unlockLocked': '密码错误次数过多，请 {min} 分钟后再试',
+    'post.unlockLeft': '密码错误，还可尝试 {n} 次',
 
     'share.title': '分享这篇文章',
     'share.copy': '复制链接',
@@ -226,6 +228,8 @@ export const ui = {
     'post.unlock': 'Unlock',
     'post.unlockWrong': 'Wrong password, please try again',
     'post.unlockNetErr': 'Network error, please try again later',
+    'post.unlockLocked': 'Too many wrong attempts. Please try again in {min} minute(s).',
+    'post.unlockLeft': 'Wrong password. {n} attempt(s) left.',
 
     'share.title': 'Share this post',
     'share.copy': 'Copy link',

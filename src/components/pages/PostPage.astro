@@ -188,7 +188,7 @@ const missingNotice = (() => {
   )}
 </Base>
 
-<script define:vars={{ postBaseSlug, unlockWrong: t('post.unlockWrong'), unlockNetErr: t('post.unlockNetErr') }}>
+<script define:vars={{ postBaseSlug, unlockWrong: t('post.unlockWrong'), unlockNetErr: t('post.unlockNetErr'), unlockLocked: t('post.unlockLocked'), unlockLeft: t('post.unlockLeft') }}>
   (function () {
     var fill = document.getElementById('reading-fill');
     if (!fill) return;
@@ -247,8 +247,20 @@ const missingNotice = (() => {
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d.ok) { location.reload(); return; }
-          // 密码错误按当前页面语言显示对应文案（API 默认返回中文，英文页映射为翻译）
-          msg.textContent = d.code === 'wrong_password' ? unlockWrong : (d.error || unlockWrong);
+          // 错误提示按当前页面语言显示（含「剩余次数」与「锁定倒计时」，API 只给 code/数值）
+          var text;
+          if (d.code === 'locked') {
+            text = unlockLocked.replace('{min}', String(Math.max(1, Math.ceil((d.retryAfter || 60) / 60))));
+          } else if (d.code === 'too_many') {
+            text = unlockLocked.replace('{min}', '1');
+          } else if (d.code === 'wrong_password') {
+            text = (typeof d.remaining === 'number' && d.remaining > 0)
+              ? unlockLeft.replace('{n}', String(d.remaining))
+              : unlockWrong;
+          } else {
+            text = d.error || unlockWrong;
+          }
+          msg.textContent = text;
           msg.classList.add('post-lock-msg-err');
         })
         .catch(function () { msg.textContent = unlockNetErr; msg.classList.add('post-lock-msg-err'); });
