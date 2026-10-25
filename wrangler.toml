@@ -30,12 +30,16 @@ directory = "./dist"
 TRANSLATE_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
 TRANSLATE_MODEL = "glm-4-flash"
 
-# 限流计数器（M-01）：绑定 KV 后，API 限流计数跨 Worker 实例共享才真正生效。
-# 创建命名空间：Cloudflare 后台 → Storage & Databases → KV → Create namespace，
-# 把返回的 id 填到下面；也可用命令行：
-#   npx wrangler kv namespace create RATE_LIMIT_KV
-# 不填（保持注释）时，代码自动退回「内存限流」——功能可用，但多 isolate 下会被绕过。
-[[kv_namespaces]]
-binding = "RATE_LIMIT_KV"
-id = "f857df29d36f4528a194fdde4aa9384d"
+# 限流计数器：已迁到 Supabase（rate_limit_hit / unlock_guard 原子 UPSERT）。
+#
+# 为什么移除 KV 绑定（2026-10-25）：
+#   KV 没有原子递增 API，get → +1 → put 是非原子读改写，并发下互相覆盖；
+#   且写入有数十秒全球传播延迟，串行请求也会读到旧值导致 429 闪断。
+#   实测并发 14 次计数永远不涨、串行 12 次出现 429 又消失。
+#   KV 的官方定位是「读多写少」的配置存储，不适合做计数器。
+#
+# 代码已完全不读 env.RATE_LIMIT_KV（全局搜索无引用），绑定留着只是浪费。
+# 对应的 KV namespace（id f857df29...）可在 Cloudflare 后台删除：
+#   Storage & Databases → KV → 选中 → Delete
+# 删除时机：本文件改动部署成功后再删，避免配置与远端不一致导致部署报错。
 
