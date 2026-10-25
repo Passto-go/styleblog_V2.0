@@ -90,8 +90,24 @@ const missingNotice = (() => {
   .post-lock-btn {
     padding: 0.55em 1.1em; border: 0; border-radius: 8px;
     background: var(--accent); color: #fff; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.45em;
+    transition: opacity 0.15s ease;
   }
-  .post-lock-btn:hover { opacity: 0.9; }
+  .post-lock-btn:hover:not(:disabled) { opacity: 0.9; }
+  /* 提交中：降低不透明度 + 禁用光标，明确表达"已收到，正在处理" */
+  .post-lock-btn:disabled { opacity: 0.65; cursor: progress; }
+  /* 转圈：纯 CSS，不依赖图标字体或外链资源 */
+  .post-lock-btn.is-loading::before {
+    content: ""; width: 0.85em; height: 0.85em; flex: 0 0 auto;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-top-color: #fff; border-radius: 50%;
+    animation: post-lock-spin 0.7s linear infinite;
+  }
+  @keyframes post-lock-spin { to { transform: rotate(360deg); } }
+  /* 尊重系统"减少动态效果"偏好 */
+  @media (prefers-reduced-motion: reduce) {
+    .post-lock-btn.is-loading::before { animation-duration: 2s; }
+  }
   .post-lock-msg { margin: 0.8em 0 0; min-height: 1.2em; font-size: 0.9em; color: var(--muted); }
   .post-lock-msg-err { color: #c0392b; }
 </style>
@@ -188,7 +204,7 @@ const missingNotice = (() => {
   )}
 </Base>
 
-<script define:vars={{ postBaseSlug, unlockWrong: t('post.unlockWrong'), unlockNetErr: t('post.unlockNetErr'), unlockLocked: t('post.unlockLocked'), unlockLeft: t('post.unlockLeft') }}>
+<script define:vars={{ postBaseSlug, unlockChecking: t('post.unlockChecking'), unlockWrong: t('post.unlockWrong'), unlockNetErr: t('post.unlockNetErr'), unlockLocked: t('post.unlockLocked'), unlockLeft: t('post.unlockLeft') }}>
   (function () {
     var fill = document.getElementById('reading-fill');
     if (!fill) return;
@@ -228,17 +244,56 @@ const missingNotice = (() => {
   })();
 
   // 加密文章解锁：提交密码到 /api/unlock，成功后整页刷新（SSR 重新渲染正文）
+  //
+  // 为什么要做 loading 态（2026-10-25）：
+  //   后端一次解锁要访问 Supabase 2 次，单次基线 270～370ms 且存在实例抖动，
+  //   实测总耗时 0.7～2s。此前请求期间页面毫无反馈，用户以为「点了没反应」
+  //   而反复点击，反而触发 IP 限流（60s 内 10 次）。这里补齐三件事：
+  //     1) 提交即禁用按钮 + 转圈，物理上阻止重复提交；
+  //     2) 文案切到「验证中…」，让等待有明确预期；
+  //     3) 无论成功/失败/超时都恢复按钮，避免卡死。
   (function () {
     var form = document.getElementById('unlock-form');
     if (!form) return;
     var input = document.getElementById('unlock-pw');
     var msg = document.getElementById('unlock-msg');
+    var btn = form.querySelector('button[type="submit"]');
+    var btnText = btn ? btn.textContent : '';
+    var busy = false;
+
+    function setBusy(on) {
+      busy = on;
+      if (btn) {
+        btn.disabled = on;
+        btn.textContent = on ? unlockChecking : btnText;
+        btn.classList.toggle('is-loading', on);
+      }
+      if (input) input.readOnly = on;
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      if (busy) return;
       var pw = (input.value || '').trim();
       if (!pw) return;
       msg.textContent = '';
       msg.className = 'post-lock-msg';
+      setBusy(true);
+
+      // 兜底超时：即使网络层卡住，20s 后也必须放开按钮，不能把用户锁死
+      var released = false;
+      var release = function () {
+        if (released) return;
+        released = true;
+        setBusy(false);
+      };
+      var guard = setTimeout(function () {
+        if (released) return;
+        release();
+        msg.textContent = unlockNetErr;
+        msg.classList.add('post-lock-msg-err');
+      }, 20000);
+
       fetch('/api/unlock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -246,7 +301,9 @@ const missingNotice = (() => {
       })
         .then(function (r) { return r.json(); })
         .then(function (d) {
+          clearTimeout(guard);
           if (d.ok) { location.reload(); return; }
+          release();
           // 错误提示按当前页面语言显示（含「剩余次数」与「锁定倒计时」，API 只给 code/数值）
           var text;
           if (d.code === 'locked') {
@@ -263,7 +320,12 @@ const missingNotice = (() => {
           msg.textContent = text;
           msg.classList.add('post-lock-msg-err');
         })
-        .catch(function () { msg.textContent = unlockNetErr; msg.classList.add('post-lock-msg-err'); });
+        .catch(function () {
+          clearTimeout(guard);
+          release();
+          msg.textContent = unlockNetErr;
+          msg.classList.add('post-lock-msg-err');
+        });
     });
   })();
 </script>
