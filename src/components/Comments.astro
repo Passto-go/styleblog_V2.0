@@ -412,7 +412,15 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
     }
 
     // 实时：审核通过的评论自动出现（仅已通过；订阅失败不影响展示）
+    // 说明：这是一项「锦上添花」的增强。失败时（如边缘代理丢失 Authorization 头、
+    // 项目未开启 Realtime）只尝试 1 次并静默放弃，绝不无限重连刷控制台。
     try {
+      // 显式把 anon key 作为 Realtime 凭据写入握手：
+      // 部分部署路径（Cloudflare 代理）会丢掉 WS 请求的 Authorization 头，
+      // 导致 Supabase 收到「no valid credentials」；显式 setAuth 可避免依赖默认推导。
+      try { supabase.realtime.setAuth(SUPABASE_ANON_KEY); } catch (_) { /* 旧版本无该方法时忽略 */ }
+
+      let settled = false;
       const channel = supabase
         .channel('comments:' + page)
         .on('postgres_changes', {
@@ -424,12 +432,21 @@ const configured = Boolean(import.meta.env.PUBLIC_SUPABASE_URL && import.meta.en
           filter: 'page=eq.' + page,
         }, () => { loadPublic(); })
         .subscribe(function (status) {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn('[comments] realtime 订阅失败（不影响显示，刷新页面即可）');
+          if (status === 'SUBSCRIBED') {
+            settled = true;
+            return;
+          }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            if (!settled) {
+              // 首次就没连上：说明环境不支持实时推送，直接退订，避免自动重连
+              console.info('[comments] 实时推送不可用，改为手动刷新查看新评论（不影响评论功能）');
+              try { supabase.removeChannel(channel); } catch (_) {}
+            }
+            settled = true;
           }
         });
     } catch (e) {
-      console.warn('[comments] realtime 订阅异常（不影响显示）', e);
+      console.info('[comments] 实时订阅已跳过（不影响评论功能）', e);
     }
 
     form.addEventListener('submit', async (e) => {
