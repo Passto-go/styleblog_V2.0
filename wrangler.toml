@@ -35,6 +35,7 @@ TRANSLATE_MODEL = "glm-4-flash"
 # 把返回的 id 填到下面；也可用命令行：
 #   npx wrangler kv namespace create RATE_LIMIT_KV
 # 不填（保持注释）时，代码自动退回「内存限流」——功能可用，但多 isolate 下会被绕过。
-# [[kv_namespaces]]
-# binding = "RATE_LIMIT_KV"
-# id = "<替换为你的 KV namespace id>"
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "f857df29d36f4528a194fdde4aa9384d"
+
