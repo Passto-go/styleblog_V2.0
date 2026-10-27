@@ -71,3 +71,7 @@ export async function verifyUnlockCookie(
   if (b !== base || !sig) return false;
   return timingSafeEqualStr(await hmacHex(base, runtimeEnv), sig);
 }
+
+// getCloudflareEnv（Astro v6+ 环境读取）统一定义在 api-guard.ts，这里 re-export，
+// 供详情页 / 解锁接口从本模块统一引用。
+export { getCloudflareEnv } from './api-guard.js';

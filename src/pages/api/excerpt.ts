@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { json, requireAdmin, rateLimitKV, parseAdminEmails } from '../../lib/api-guard.js';
+import { json, requireAdmin, rateLimitKV, parseAdminEmails, getCloudflareEnv } from '../../lib/api-guard.js';
 import { aiExcerpt } from '../../lib/excerpt.js';
 
 // 动态 API：运行在 Cloudflare Worker 上，LLM 的 API key 只存在于服务端
@@ -16,7 +16,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     //    任何能注册该 Supabase 项目的用户都能调用，白嫖站长付费 LLM 额度）
     const auth = request.headers.get('Authorization') || '';
     const token = auth.replace(/^Bearer\s+/i, '').trim();
-    const runtimeEnv = (locals as any)?.runtime?.env || {};
+    // Astro v6+：运行时 Secret 改由 cloudflare:workers 读取（见 getCloudflareEnv）
+    const runtimeEnv = (await getCloudflareEnv()) || {};
     const adminEmails = parseAdminEmails(
       runtimeEnv.ADMIN_EMAILS || (import.meta as any).env.ADMIN_EMAILS
     );
@@ -60,7 +61,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // 4. 调用 LLM 生成摘要
     try {
-      const env = (locals as any).runtime?.env || {};
+      const env = (await getCloudflareEnv()) || {};
       const result = await aiExcerpt({ title, content, lang, maxLen, style }, env);
       return json({ ok: true, ...result, source: 'ai' });
     } catch (e: any) {

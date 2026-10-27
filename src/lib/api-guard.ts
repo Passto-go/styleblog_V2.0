@@ -19,6 +19,20 @@
 //     （默认拒绝，避免「忘了配置 = 全开放」这类失败方向。）
 import { createClient } from '@supabase/supabase-js';
 
+// Astro v6+ 兼容：Cloudflare 运行时绑定（含 Secret，如 TRANSLATE_API_KEY / UNLOCK_SECRET）
+// 改由 `cloudflare:workers` 模块导出，旧的 `Astro.locals.runtime.env` / `locals.runtime.env`
+// 已在 v6 移除，直接访问会抛 "Astro.locals.runtime.env has been removed" 异常。
+// dev（Node）下该模块不存在，动态导入失败时回退 undefined，调用方再回退 import.meta.env / DEV 兜底。
+// @vite-ignore：避免 Vite 在构建期静态解析这个仅 Cloudflare 运行时存在的伪模块。
+export async function getCloudflareEnv(): Promise<Record<string, unknown> | undefined> {
+  try {
+    const mod: any = await import(/* @vite-ignore */ 'cloudflare:workers');
+    return (mod?.env ?? undefined) as Record<string, unknown> | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,

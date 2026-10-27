@@ -2,7 +2,7 @@
 import PostPage from '../../components/pages/PostPage.astro';
 import FourOhFour from '../404.astro';
 import { getPostWithVersions, getEncryptedContent } from '../../lib/posts.js';
-import { verifyUnlockCookie } from '../../lib/unlock.js';
+import { verifyUnlockCookie, getCloudflareEnv } from '../../lib/unlock.js';
 
 // SSR：每请求现查 Supabase，新文章发布后即刻可访问，无需重新构建
 const { slug } = Astro.params;
@@ -15,8 +15,10 @@ if (!versions) Astro.response.status = 404;
 // 未解锁则不向前端传正文/摘要，从根源避免正文进入 HTML 源码。
 let unlocked = true;
 let passHint = '';
+// Astro v6+：Cloudflare 运行时 Secret 改由 cloudflare:workers 模块读取（见 getCloudflareEnv）。
+const cfEnv = await getCloudflareEnv();
 if (versions && versions.encrypted) {
-  unlocked = await verifyUnlockCookie(Astro.cookies.get('unlocked')?.value, versions.base, (Astro.locals as any).runtime?.env);
+  unlocked = await verifyUnlockCookie(Astro.cookies.get('unlocked')?.value, versions.base, cfEnv);
   passHint = versions.passHint || '';
   // 加密内容不参与公共缓存（避免未解锁 HTML 被边缘节点缓存后误吐给他人）
   Astro.response.headers.set('Cache-Control', 'private, no-store');
@@ -29,7 +31,7 @@ if (versions && versions.encrypted) {
 // 解锁后改由服务端经 get_post_content 取回真实正文（令牌校验在服务端完成）。
 let realContent = versions ? versions.post.content : '';
 if (unlocked && versions && versions.encrypted) {
-  const secret = import.meta.env.UNLOCK_SECRET || (Astro.locals as any).runtime?.env?.UNLOCK_SECRET || '';
+  const secret = import.meta.env.UNLOCK_SECRET || (cfEnv as any)?.UNLOCK_SECRET || '';
   realContent = await getEncryptedContent(versions.base, Astro.cookies.get('unlocked')?.value, secret);
 }
 

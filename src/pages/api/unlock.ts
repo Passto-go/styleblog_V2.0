@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
-import { makeUnlockCookieValue } from '../../lib/unlock.js';
+import { makeUnlockCookieValue, getCloudflareEnv } from '../../lib/unlock.js';
 import { baseSlug } from '../../lib/posts.js';
 import { rateLimitKV, type RateLimitTrace } from '../../lib/api-guard.js';
 
@@ -170,7 +170,9 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
       request.headers.get('cf-connecting-ip') ||
       request.headers.get('x-forwarded-for') ||
       'anon';
-    const runtimeEnv = (locals as any)?.runtime?.env || {};
+    // Astro v6+：Cloudflare 运行时 Secret 改由 cloudflare:workers 读取（见 getCloudflareEnv），
+    // 旧的 locals.runtime.env 已移除，直接访问会抛异常导致解锁接口 500。
+    const runtimeEnv = (await getCloudflareEnv()) || {};
     // 文章锁定与限流都走 Supabase 原子函数；配置缺失或数据库异常时内部退回内存
     const sbCfg = { url: supabaseUrl, anon: supabaseAnon };
 
