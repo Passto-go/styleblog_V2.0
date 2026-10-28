@@ -310,13 +310,19 @@ const missingNotice = (() => {
 
       fetch('/api/unlock', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug: postBaseSlug, password: pw }),
       })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           clearTimeout(guard);
-          if (d.ok) { location.reload(); return; }
+          if (d.ok) {
+            // iOS Safari 偶发：fetch 响应下发的 unlocked cookie 还没落盘就 reload，
+            // 服务端读不到又渲染密码页，表现为反复跳回。让出一拍再刷新。
+            setTimeout(function () { location.reload(); }, 250);
+            return;
+          }
           release();
           // 错误提示按当前页面语言显示（含「剩余次数」与「锁定倒计时」，API 只给 code/数值）
           var text;
