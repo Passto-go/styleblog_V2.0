@@ -13,7 +13,7 @@
 - **自带后台管理界面**：`/admin` 提供文章写作、评论审核、分类管理、倒计时配置等能力，无需登录第三方 CMS。
 - **零成本部署**：构建产物为标准 Cloudflare Worker，部署到 Workers 免费额度（无限带宽、3,000 构建分钟/月、10 万请求/天）。
 
-技术栈：**Astro 4 + @astrojs/cloudflare + Supabase + Cloudflare Workers**。
+技术栈：**Astro 7.3.8 + @astrojs/cloudflare 14.3.0 + Supabase + Cloudflare Workers**。
 
 ---
 
@@ -59,7 +59,7 @@
 - **依赖**：需先执行 `supabase/encryption.sql`，并配置服务端密钥 `UNLOCK_SECRET`（见配置章节）；teaser 模式另需执行 `supabase/encryption_teaser.sql`（增量，v2 之后）；哈希隔离加固另需执行 `supabase/encryption_hash_private.sql`（把哈希迁入 PostgREST 不暴露的私有表，推荐）。
 
 ### 一键翻译（可选）
-后台管理界面可调用翻译接口，把文章译成英文 / 日文版本（需配置翻译 key，详见配置章节）。翻译走 **OpenAI 兼容协议**，可搭配任意兼容服务（Gemini / DeepSeek / 智谱 GLM 等）：换服务只需改 `TRANSLATE_BASE_URL` / `TRANSLATE_MODEL` 两个变量，代码零改动。长文自动按二级标题分段翻译（段间 2 秒间隔防限流），失败指数退避重试。
+后台管理界面可调用翻译接口，把文章译成英文版本（需配置翻译 key，详见配置章节）。翻译走 **OpenAI 兼容协议**，可搭配任意兼容服务（Gemini / DeepSeek / 智谱 GLM 等）：换服务只需改 `TRANSLATE_BASE_URL` / `TRANSLATE_MODEL` 两个变量，代码零改动。长文自动按二级标题分段翻译（段间 2 秒间隔防限流），失败指数退避重试。
 
 ---
 
@@ -67,8 +67,8 @@
 
 | 类别 | 选型 |
 |---|---|
-| 框架 | Astro `^4.16.0`（SSR：`output: 'server'`） |
-| 适配器 | `@astrojs/cloudflare` `~11.2.0`（`nodejs_compat`） |
+| 框架 | Astro `7.3.8`（SSR：`output: 'server'`） |
+| 适配器 | `@astrojs/cloudflare` `14.3.0`（`nodejs_compat`） |
 | 数据库 / 鉴权 | Supabase（Postgres + RLS + Auth + Storage + Realtime） |
 | Markdown | `marked` `^12.0.2` |
 | 订阅 / 站点地图 | `@astrojs/rss` `^4.0.7`、`@astrojs/sitemap` `^3.2.1` |
@@ -105,7 +105,7 @@ styleblog_V2.0/
 │     ├─ index.astro about.astro archive.astro search.astro
 │     ├─ categories/index.astro categories/[category].astro   # 分类列表 / 分类详情
 │     ├─ posts/[slug].astro rss.xml.js sitemap-index.xml.js search-index.json.js
-│     ├─ en/  ja/           # 英文 / 日文全量镜像（index/about/archive/categories/posts/search/rss）
+│     ├─ en/                 # 英文全量镜像（index/about/archive/categories/posts/search/rss；日文镜像暂未实现）
 │     ├─ admin.astro         # 后台管理界面（五模块）
 │     ├─ api/translate.ts    # 一键翻译接口
 │     ├─ api/unlock.ts       # 文章解锁密码校验接口（DB 端 bcrypt 比对 + 签发签名 cookie）
@@ -186,7 +186,7 @@ PUBLIC_SITE_URL=
 | 变量 | 当前值 | 说明 |
 |---|---|---|
 | `TRANSLATE_BASE_URL` | `https://open.bigmodel.cn/api/paas/v4/` | 翻译接口（OpenAI 兼容端点，当前指向智谱 GLM；可换成 DeepSeek / Moonshot / Gemini 等任意兼容服务，改这两个值即可，代码零改动） |
-| `TRANSLATE_MODEL` | `glm-4.7-flash` | 翻译模型名（智谱 GLM-4.7-Flash 为模型级永久免费，个人博客用量足够；换服务时同步改为对应模型名） |
+| `TRANSLATE_MODEL` | `glm-4-flash` | 翻译模型名（智谱 GLM 免费额度足够个人博客；换服务时同步改为对应模型名；须与 `wrangler.toml:34` 的 `TRANSLATE_MODEL` 取值一致） |
 
 ### Cloudflare Secret（敏感，**不**写进代码）
 
