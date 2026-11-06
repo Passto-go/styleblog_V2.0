@@ -1,6 +1,11 @@
 # 吾道一以贯之 · 多语种个人博客
 
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](LICENSE)
+[![License type: Source-available](https://img.shields.io/badge/License%20type-Source--available-lightgrey.svg)](#十三许可证)
+
 > 一个支持**中文 / English**双语、内容存于 Supabase、以 **Cloudflare Workers（SSR）** 零成本托管的个人博客系统。
+
+> **许可 / License**：源代码 [CC BY-NC-SA 4.0](LICENSE)（署名—非商业性使用—相同方式共享 4.0 国际；属「源码公开」，非 OSI 定义的开源许可）；文章、图片与页面版式保留所有权利，授权范围见 [hxlss.cn/copyright](https://hxlss.cn/copyright)。二者并行适用，互不覆盖。
 
 ---
 
@@ -269,6 +274,15 @@ PUBLIC_SITE_URL=
 
 ## 十三、许可证
 
-本项目内容采用**自定义转载规则（非 CC 协议）**：允许非商业引用并注明出处，禁止整篇转载、商业化使用及去除署名。完整条款见线上 `/copyright`（及 `/zh/copyright`）。
+本项目分两块授权，互不覆盖：
+
+| 对象 | 许可 | 说明 |
+|---|---|---|
+| 文章、图片、页面版式 | 自定义转载规则（非 CC 协议） | 允许非商业引用并注明出处，禁止整篇转载、商业化使用及去除署名 |
+| 源代码 | [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) | 署名、非商业、相同方式共享；全文见根目录 `LICENSE` |
+
+> 代码这块含非商业限制，不属于 OSI 定义的开源许可，准确说法是「源码公开（source-available）」。CC 许可一经发布不可撤销。
+>
+> 完整条款见线上 `/copyright`（及 `/en/copyright`）。
 
 > 由 **Astro + Supabase + Cloudflare** 构建。

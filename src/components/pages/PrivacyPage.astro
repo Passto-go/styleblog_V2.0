@@ -4,28 +4,28 @@ import Base from '../../layouts/Base.astro';
 const { lang } = Astro.props;
 const EMAIL = 'intl1024@outlook.com';
 const MAILTO = `mailto:${EMAIL}?subject=${encodeURIComponent(lang === 'zh' ? '隐私相关事宜' : 'Privacy inquiry')}`;
-const lastUpdated = lang === 'zh' ? '最后更新：2026 年 10 月 23 日' : 'Last updated: 2026-10-23';
+const lastUpdated = lang === 'zh' ? '最后更新：2026 年 11 月 7 日' : 'Last updated: 2026-11-07';
 
 // 目录（Table of Contents）：章节锚点中英文共用 id，标题按语言展示。
 // 参考 Cloudflare 隐私政策的左固定目录 + 右正文形态。
 const TOC = [
-  { id: 'collect',    zh: '一、我收集哪些信息',     en: '1. What I collect' },
+  { id: 'collect',    zh: '一、本站收集的信息',     en: '1. Information collected' },
   { id: 'use',        zh: '二、每项信息的用途',     en: '2. How each item is used' },
   { id: 'watermark',  zh: '三、关于页面水印',       en: '3. About the page watermark' },
   { id: 'cookies',    zh: '四、Cookie 与浏览器本地存储', en: '4. Cookies and local storage' },
   { id: 'thirdparty', zh: '五、涉及哪些第三方服务', en: '5. Third-party services involved' },
-  { id: 'analytics',  zh: '六、关于统计与你的选择', en: '6. Analytics and your choice' },
-  { id: 'retention',  zh: '七、数据保存多久',       en: '7. How long data is kept' },
-  { id: 'rights',     zh: '八、你可以怎么做',       en: '8. What you can do' },
-  { id: 'crossborder',zh: '九、关于跨境与未成年人', en: '9. Cross-border transfers and minors' },
+  { id: 'analytics',  zh: '六、关于统计与访客的选择', en: '6. Analytics and visitors’ choices' },
+  { id: 'retention',  zh: '七、数据保存期限',       en: '7. Data retention periods' },
+  { id: 'rights',     zh: '八、访客的权利与行使方式', en: '8. Visitors’ rights and how to exercise them' },
+  { id: 'crossborder',zh: '九、跨境传输与未成年人',   en: '9. Cross-border transfers and minors' },
   { id: 'changes',    zh: '十、本说明的变更',       en: '10. Changes to this notice' },
 ];
 
 const title = lang === 'zh' ? '隐私说明' : 'Privacy Policy';
-const leadZh = '本站（吾道一以贯之）是一个个人博客。本隐私说明阐述本站如何处理访客的个人信息，包括我们收集哪些信息、用于何种目的、是否会与第三方共享、保存期限，以及你对本站所持有信息的权利。';
-const leadEn = 'This site (The Way, One Thread) is a personal blog. This privacy policy describes how this site handles visitors’ personal information — what we collect, why we collect it, whether it is shared with third parties, how long it is retained, and the rights you have over the information we hold.';
-const oneLinerZh = '不做跨站追踪、不画像、不投放广告、不卖数据。只有你主动留评论时才会留下信息；页面水印会读取你的 IP 和设备时区用于防盗，但不存库、不外发。';
-const oneLinerEn = 'No cross-site tracking, no profiling, no advertising, and no data sales. The only information you directly provide is when you post a comment. For the page watermark, the site reads your IP address and device time zone at render time. The site itself does not store this information or send it to third parties.';
+const leadZh = '本站（吾道一以贯之）为个人博客。本说明载明本站处理访客个人信息的方式，包括收集的信息范围、处理目的、是否向第三方提供、保存期限，以及访客就其个人信息享有的权利。';
+const leadEn = 'This site (The Way, One Thread) is a personal blog. This notice sets out how the site processes visitors’ personal information, including the categories of information collected, the purposes of processing, whether information is provided to third parties, retention periods, and the rights visitors hold in respect of their information.';
+const oneLinerZh = '本站不进行跨站追踪、用户画像、广告投放或数据交易。访客信息仅在你主动发表评论时产生；页面溯源水印会在渲染时读取 IP 地址与设备时区，但该信息不写入数据库、不对外传输。此外，加密文章的解锁与部分接口的访问频率限制会将 IP 地址临时写入数据库（详见第五节），保存期限见第七节。';
+const oneLinerEn = 'This site does not engage in cross-site tracking, user profiling, advertising, or data trading. Visitor information is generated only when you voluntarily post a comment. The page watermark reads your IP address and device time zone at render time, but does not store or transmit this information. Separately, unlock attempts on protected posts and rate limiting on certain endpoints write your IP address temporarily to the database (see Section 5); retention periods are set out in Section 7.';
 const tocLabel = lang === 'zh' ? '目录' : 'Contents';
 ---
 
@@ -65,29 +65,30 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
     <div class="privacy-main prose">
         {lang === 'zh' ? (
           <Fragment>
-            <h2 id="collect">一、我收集哪些信息</h2>
+            <h2 id="collect">一、本站收集的信息</h2>
             <h3>1. 你主动提供的</h3>
             <div class="table-wrap"><table>
               <thead>
-                <tr><th>信息</th><th>什么时候</th><th>是否必填</th></tr>
+                <tr><th>信息</th><th>产生场景</th><th>是否必填</th></tr>
               </thead>
               <tbody>
                 <tr><td>昵称</td><td>发表评论时</td><td>必填</td></tr>
-                <tr><td>邮箱</td><td>发表评论时</td><td>必填，但<strong>不会公开显示</strong></td></tr>
-                <tr><td>评论内容</td><td>发表评论时</td><td>必填，上限 1000 字</td></tr>
+                <tr><td>邮箱</td><td>发表评论时</td><td>必填；不在页面公开展示</td></tr>
+                <tr><td>评论内容</td><td>发表评论时</td><td>必填，长度上限 1000 字</td></tr>
               </tbody>
             </table></div>
+            <p>评论提交后进入待审核状态，经站长审核通过后方在页面公开展示；未通过的评论不予展示。系统同时为每条评论生成一个随机删除令牌，用于你日后自行删除该条评论。</p>
             <h3>2. 访问页面时自动读取的</h3>
             <div class="table-wrap"><table>
               <thead>
                 <tr><th>信息</th><th>用途</th><th>是否存储</th></tr>
               </thead>
               <tbody>
-                <tr><td>IP 地址</td><td>生成页面水印，用于内容溯源</td><td><strong>不存储</strong></td></tr>
-                <tr><td>设备时区</td><td>让水印显示你当地的日期</td><td><strong>不存储</strong></td></tr>
+                <tr><td>IP 地址</td><td>生成页面溯源水印；加密文章解锁与部分接口的频率限制</td><td>水印用途不存储；频率限制用途临时存储，详见第五节</td></tr>
+                <tr><td>设备时区</td><td>使水印显示访客当地日期</td><td><strong>不存储</strong></td></tr>
               </tbody>
             </table></div>
-            <blockquote>说明：这两项仅在服务端渲染页面时即时读取，用于拼出水印文字，<strong>不写入数据库、不写入访问日志、不发送给任何第三方</strong>。</blockquote>
+            <blockquote>就水印用途而言，IP 地址与设备时区仅在服务端渲染页面时即时读取，用于生成水印文字，不写入数据库、不写入应用日志、不发送给任何第三方。频率限制用途的处理方式不同，见第五节。</blockquote>
             <h3>3. 只有博主本人涉及的</h3>
             <p>后台登录使用 Supabase 账号体系，仅博主本人持有账号。密码以单向哈希形式保存，本站无法还原明文。访客无需注册、无需登录即可阅读与评论。</p>
 
@@ -97,118 +98,129 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><th>信息</th><th>用途</th><th>会不会用于其他目的</th></tr>
               </thead>
               <tbody>
-                <tr><td>昵称</td><td>展示在你的评论旁</td><td>否</td></tr>
-                <tr><td>邮箱</td><td>识别评论者身份；出现争议时联系你</td><td><strong>不公开、不营销、不分享、不出售</strong></td></tr>
-                <tr><td>评论内容</td><td>公开展示在对应文章下</td><td>否</td></tr>
-                <tr><td>IP 地址</td><td><strong>仅</strong>生成水印标识；统计服务另有独立处理见 §六</td><td>本站不做画像、不累积历史</td></tr>
-                <tr><td>设备时区</td><td><strong>仅</strong>计算水印上的当地日期</td><td>同上</td></tr>
+                <tr><td>昵称</td><td>在评论旁公开展示</td><td>否</td></tr>
+                <tr><td>邮箱</td><td>识别评论者身份；发生争议时联系评论者</td><td><strong>不在页面公开展示、不用于营销、不向第三方提供、不出售</strong></td></tr>
+                <tr><td>评论内容</td><td>审核通过后在对应文章下公开展示</td><td>否</td></tr>
+                <tr><td>IP 地址</td><td>生成溯源水印；加密文章解锁与部分接口的频率限制（见第五节）</td><td>本站不用于用户画像、不保留访问历史</td></tr>
+                <tr><td>设备时区</td><td><strong>仅</strong>用于计算水印所示当地日期</td><td>同上</td></tr>
               </tbody>
             </table></div>
-            <p>本站<strong>不做</strong>以下事情：用户画像、行为分析、兴趣标签、个性化推荐、广告投放、数据交易。</p>
+            <p>本站不进行下列处理：用户画像、行为分析、兴趣标签、个性化推荐、广告投放、数据交易。</p>
 
             <h2 id="watermark">三、关于页面水印</h2>
-            <p>你可能会注意到页面上有一层很淡的斜向文字，这是本站的溯源水印。</p>
+            <p>本站页面叠加有一层低透明度的斜向文字，用作内容溯源标识。</p>
             <ul>
-              <li><strong>内容</strong>：<code>IP 标识 · 你当地的日期 · 站点名称</code>
+              <li><strong>构成</strong>：<code>IP 标识 · 访客当地日期 · 站点名称</code>
                 <ul>
-                  <li>IPv4 显示完整地址；IPv6 为控制长度，只保留前 4 段（如 <code>240e:39e:490:b5b1</code>）</li>
+                  <li>IPv4 地址完整显示；IPv6 地址为控制长度仅保留前 4 段（如 <code>240e:39e:490:b5b1</code>）</li>
                 </ul>
               </li>
-              <li><strong>目的</strong>：在内容被整篇搬运、截图外传时，能够判断泄漏来源。这是对原创内容的最低限度保护。</li>
-              <li><strong>不做什么</strong>：不记录你的浏览轨迹、不建立个人档案、不与你在此页面上产生的日常访问数据做关联、不与任何第三方共享（统计服务的独立处理见 §六）。</li>
-              <li><strong>可见性</strong>：透明度很低，正常阅读几乎无感，不影响页面的任何点击与选中操作。</li>
+              <li><strong>目的</strong>：在内容被整篇搬运或截图外传时，用以判断泄漏来源，作为原创内容的最低限度保护措施。</li>
+              <li><strong>处理限度</strong>：不记录浏览轨迹、不建立个人档案、不与访客的其他访问数据关联、不向第三方提供（统计服务的独立处理见第六节）。</li>
+              <li><strong>可见性</strong>：透明度较低，正常阅读不易察觉，不影响页面的点击与选中操作。</li>
             </ul>
-            <p>如果你介意这一点，可以使用浏览器扩展屏蔽页面元素，或开启无痕模式访问——本站不依赖水印实现任何功能，屏蔽后不影响阅读。</p>
+            <p>访客如不希望显示该水印，可通过浏览器扩展屏蔽对应页面元素，或以无痕模式访问。本站不依赖水印实现任何功能，屏蔽后不影响内容阅读。</p>
 
             <h2 id="cookies">四、Cookie 与浏览器本地存储</h2>
-            <p>本站不使用任何<strong>广告</strong> cookie，也不做跨站追踪。Cookie 按下表分两类：<strong>必要的</strong>（无需同意）与<strong>仅在你同意后出现的</strong>（Google Analytics）。</p>
+            <p>本站不使用任何广告 Cookie，亦不进行跨站追踪。Cookie 按功能分为两类：保障网站功能所必需者（无需同意），以及在访客同意后方才设置者（Google Analytics）。</p>
             <div class="table-wrap"><table class="table-wide">
               <thead>
                 <tr><th>名称</th><th>类型</th><th>作用</th><th>期限</th><th>是否需要同意</th></tr>
               </thead>
               <tbody>
-                <tr><td><code>unlocked</code></td><td>Cookie</td><td>记住加密文章已解锁的状态。内容为页面标识与签名的组合，<strong>不含任何个人信息</strong></td><td>30 天</td><td>否（网站功能必需）</td></tr>
-                <tr><td><code>theme</code></td><td>浏览器本地存储</td><td>记住你选择的深色 / 浅色主题</td><td>直到你清除浏览器数据</td><td>否（仅存本地）</td></tr>
-                <tr><td><code>styleblog-my-comments</code></td><td>浏览器本地存储</td><td>保存你的评论删除凭证，让你能自行管理发过的评论</td><td>同上</td><td>否（仅存本地）</td></tr>
-                <tr><td><code>analytics-consent</code></td><td>浏览器本地存储</td><td>记住你对统计的选择（<code>granted</code> / <code>denied</code>），避免每次访问都弹窗询问</td><td>直到你清除浏览器数据</td><td>否（仅存本地）</td></tr>
-                <tr><td><code>_ga</code></td><td>Cookie</td><td>Google Analytics 用于区分访客的随机标识</td><td>最长 2 年</td><td><strong>是</strong>——未点「同意」绝不写入</td></tr>
-                <tr><td><code>_ga_&lt;容器ID&gt;</code></td><td>Cookie</td><td>Google Analytics 4 用于维持会话状态</td><td>最长 2 年</td><td><strong>是</strong>——未点「同意」绝不写入</td></tr>
+                <tr><td><code>unlocked</code></td><td>Cookie</td><td>记录加密文章的解锁状态，内容为页面标识与签名的组合，<strong>不含个人信息</strong></td><td>30 天</td><td>否（网站功能必需）</td></tr>
+                <tr><td><code>theme</code></td><td>浏览器本地存储</td><td>保存访客选择的深色或浅色主题</td><td>直到你清除浏览器数据</td><td>否（仅存本地）</td></tr>
+                <tr><td><code>styleblog-my-comments</code></td><td>浏览器本地存储</td><td>保存访客的评论删除令牌，用于自行删除已发表的评论</td><td>同上</td><td>否（仅存本地）</td></tr>
+                <tr><td><code>analytics-consent</code></td><td>浏览器本地存储</td><td>保存访客对统计的选择（<code>granted</code> / <code>denied</code>），以避免重复询问</td><td>直到你清除浏览器数据</td><td>否（仅存本地）</td></tr>
+                <tr><td><code>_ga</code></td><td>Cookie</td><td>Google Analytics 用以区分访客的随机标识符</td><td>最长 2 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
+                <tr><td><code>_ga_&lt;容器ID&gt;</code></td><td>Cookie</td><td>Google Analytics 4 用以维持会话状态</td><td>最长 2 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
               </tbody>
             </table></div>
             <ul>
-              <li>除 <code>unlocked</code> 与 <code>_ga*</code> 会随请求发送外，其余均<strong>只存在你的浏览器本地</strong>，不上传服务器。</li>
-              <li>清除浏览器数据即可全部移除，不影响阅读。</li>
-              <li><code>unlocked</code> 为 <code>HttpOnly</code> 且 <code>SameSite=Lax</code>，脚本无法读取，仅用于判断解锁状态。</li>
+              <li>除 <code>unlocked</code> 与 <code>_ga*</code> 会随请求发送外，其余均仅存于访客浏览器本地，不上传服务器。</li>
+              <li>清除浏览器数据即可全部移除，不影响内容阅读。</li>
+              <li><code>unlocked</code> 设置 <code>HttpOnly</code> 与 <code>SameSite=Lax</code> 属性，页面脚本无法读取，仅用于判断解锁状态，有效期为 30 天。</li>
+              <li>关于评论删除凭证：除浏览器本地保存的副本外，其对应记录亦保存在本站数据库的评论记录中（字段名 <code>delete_token</code>），用于在服务端校验删除请求的权限。该令牌仅为随机字符串，不含访客身份信息；删除评论后随之移除。</li>
             </ul>
 
             <h2 id="thirdparty">五、涉及哪些第三方服务</h2>
-            <p>本站没有自建服务器，数据链路涉及以下服务：</p>
+            <p>本站自身不设独立服务器，全部请求经由以下第三方服务处理。此外，加密文章解锁及翻译、摘要接口的访问频率限制会将访客 IP 地址写入本站数据库，处理方式见本节末尾。</p>
             <div class="table-wrap"><table>
               <thead>
                 <tr><th>服务</th><th>承担的角色</th><th>涉及的数据</th></tr>
               </thead>
               <tbody>
-                <tr><td>Cloudflare</td><td>网站托管、全球内容分发、<strong>Web Analytics 访问统计</strong></td><td>请求转发；统计不使用 Cookie、不做指纹识别（平台自身按其政策处理网络层日志）</td></tr>
-                <tr><td>Supabase</td><td>数据库与登录鉴权</td><td>文章、评论、博主账号</td></tr>
+                <tr><td>Cloudflare</td><td>网站托管、全球内容分发、<strong>Web Analytics 访问统计</strong></td><td>请求转发；统计不使用 Cookie、不做设备指纹识别（平台按其自身政策处理网络层日志）</td></tr>
+                <tr><td>Supabase</td><td>数据库、登录鉴权与对象存储</td><td>文章、评论（含昵称、邮箱、删除令牌）、站长账号、访问频率限制记录（含 IP 地址）</td></tr>
                 <tr><td>GitHub</td><td>代码托管</td><td>不涉及访客数据</td></tr>
-                <tr><td><strong>Google Analytics</strong>（可选）</td><td>访问统计</td><td><strong>仅在你点击「同意」后才加载</strong>，数据传至 Google（美国）</td></tr>
+                <tr><td>智谱 GLM（bigmodel.cn）</td><td>站长在后台撰写与翻译文章时使用的语言模型服务</td><td>仅处理站长提交的文章文本，不涉及访客数据</td></tr>
+                <tr><td><strong>Google Analytics</strong>（可选）</td><td>访问统计</td><td><strong>仅在访客点击「同意」后加载</strong>，数据传至 Google（美国）</td></tr>
               </tbody>
             </table></div>
-            <p>本站<strong>不接入</strong>：百度统计、友盟、51LA 等国内统计平台；<strong>没有任何广告联盟、联盟营销或行为追踪脚本</strong>。</p>
-
-            <h2 id="analytics">六、关于统计与你的选择</h2>
-            <p>本站接入统计分析的目的是：<strong>了解网站流量，以及查看访客的互动度与留存情况</strong>——具体来说，就是想知道哪些文章真的有人在读、读者从哪里来、读完一篇后是否会继续看别的、过一段时间是否还会回来。这些信息仅用于判断该写什么、怎么改进，不做他用。</p>
-            <p>本站使用两套统计，它们的性质完全不同，请分开理解：</p>
-            <h3>1. Cloudflare Web Analytics（始终运行，无需同意）</h3>
+            <p>本站不接入百度统计、友盟、51LA 等国内统计平台，亦无广告联盟、联盟营销或行为追踪脚本。</p>
+            <h3>关于 IP 地址的临时存储</h3>
+            <p>为防止暴力破解与接口滥用，下列操作会将访客 IP 地址写入本站数据库：</p>
             <ul>
-              <li>不使用 Cookie、不使用本地存储、不做设备指纹识别。</li>
-              <li>记录的是页面级聚合指标：浏览量、来源、国家/地区、页面性能。</li>
-              <li>Cloudflare 说明其 Web Analytics 不收集或使用访客个人数据，也不使用 Cookie 或设备指纹进行统计。它与可选启用的 Google Analytics 相互独立，本站也不提供单独的开关。</li>
+              <li><strong>加密文章解锁</strong>：以 <code>rl:unlock:ip:&lt;IP 地址&gt;</code> 为标识，记录请求计数与失败次数，用于限制尝试频率并在连续失败后临时锁定；</li>
+              <li><strong>翻译与摘要接口</strong>：按账号标识计数，不单独记录 IP 地址。</li>
             </ul>
-            <h3>2. Google Analytics（默认不加载，需你同意）</h3>
-            <ul>
-              <li>首次访问时，页面底部会出现一个横幅，询问是否允许加载 Google Analytics。</li>
-              <li>两个选项均无默认选中，且按钮样式同等突出。</li>
-              <li><strong>在你点击「同意」之前，Google Analytics 的脚本根本不会被下载</strong>——不是加载后再阻止上报，而是完全不请求。</li>
-              <li>点「拒绝」后，Google Analytics 永不加载，站点功能不受任何影响。</li>
-              <li>无论你选哪个，选择都会记在浏览器本地，之后不再重复询问；清除浏览器数据后会重新询问。</li>
-              <li>同意后它协助衡量的指标包括：页面浏览量、会话数、平均互动时长、跳出情况、新老访客比例与回访情况。Google Analytics 在收集时使用 IP 地址提供基础服务与大致地理位置，但不会记录或存储原始 IP 地址。相关数据不用于广告投放或跨站重定向。</li>
-            </ul>
-            <h3>3. 国内访客的实际体验</h3>
-            <p>Google Analytics 的脚本位于 <code>googletagmanager.com</code>，在中国大陆部分网络下<strong>可能无法加载或极慢</strong>。这种情况下即便你点了「同意」，也不会有数据上报——这属于网络限制，不是本站的行为。这也是本站仍然需要 Cloudflare Web Analytics 的原因：它是国内访客唯一能被可靠统计到的渠道。</p>
-            <h3>4. 你可以随时改变主意</h3>
-            <p>清除浏览器的本地存储（或使用无痕窗口）即可重新触发询问；如果之前点过「同意」而想反悔，清除 <code>analytics-consent</code> 这一项后刷新页面，重新点「拒绝」即可。</p>
+            <p>上述解锁相关记录以明文 IP 地址作为标识键保存在 <code>rate_limit_state</code> 与 <code>unlock_fail_state</code> 两张表中，用于计数窗口的滚动判断。该类记录不与评论、邮箱等身份信息关联，不用于用户画像，保存期限见第七节。</p>
 
-            <h2 id="retention">七、数据保存多久</h2>
+            <h2 id="analytics">六、关于统计与访客的选择</h2>
+            <p>本站接入访问统计的目的限于了解网站流量，以及与内容相关的互动与留存情况，即判断文章的实际阅读情况、访客来源、跨篇阅读行为与回访比例。上述信息仅用于决定内容方向与改进方式，不作其他用途。</p>
+            <p>本站同时使用两套统计工具，其性质不同，应分别理解：</p>
+            <h3>1. Cloudflare Web Analytics（始终启用，无需同意）</h3>
+            <ul>
+              <li>不使用 Cookie、不使用本地存储、不进行设备指纹识别。</li>
+              <li>记录的为页面级聚合指标，包括浏览量、来源、国家或地区、页面性能。</li>
+              <li>据 Cloudflare 说明，其 Web Analytics 不收集或使用访客个人数据，亦不使用 Cookie 或设备指纹进行统计。该服务与可选启用的 Google Analytics 相互独立，本站未对其提供单独开关。</li>
+            </ul>
+            <h3>2. Google Analytics（默认不加载，须经同意）</h3>
+            <ul>
+              <li>首次访问时页面底部显示告知横幅，询问是否允许加载 Google Analytics。</li>
+              <li>「同意」与「拒绝」两个选项均不预设选中，样式同等突出。</li>
+              <li>在访客点击「同意」之前，Google Analytics 的脚本不会被下载或请求，而非加载后再行拦截上报。</li>
+              <li>点击「拒绝」后，Google Analytics 始终不加载，站点功能不受影响。</li>
+              <li>无论作何选择，该选择均记录于浏览器本地，之后不再重复询问；清除浏览器数据后将重新询问。</li>
+              <li>同意后衡量的指标包括页面浏览量、会话数、平均互动时长、跳出情况、新老访客比例与回访情况。本站已启用 IP 匿名化（<code>anonymize_ip</code>）配置；Google Analytics 在收集数据时使用 IP 地址以提供基础服务与粗略地理位置判断，但不记录或存储完整 IP 地址。相关数据不用于广告投放或跨站定向。</li>
+            </ul>
+            <h3>3. 中国大陆网络环境下的实际情况</h3>
+            <p>Google Analytics 的脚本位于 <code>googletagmanager.com</code>，在中国大陆部分网络环境下可能无法加载或加载缓慢。此时即使访客已选择「同意」，亦不会产生数据上报，此属网络条件限制，非本站行为。这也是本站保留 Cloudflare Web Analytics 的原因：该服务是中国大陆访客可被稳定统计的渠道。</p>
+            <h3>4. 更改统计选择</h3>
+            <p>清除浏览器本地存储或使用无痕窗口访问，即可重新触发询问。若此前选择「同意」而希望撤回，可清除 <code>analytics-consent</code> 存储项后刷新页面，重新选择「拒绝」。</p>
+
+            <h2 id="retention">七、数据保存期限</h2>
             <div class="table-wrap"><table>
               <thead>
                 <tr><th>数据</th><th>保存期限</th></tr>
               </thead>
               <tbody>
-                <tr><td>评论（昵称、邮箱、内容）</td><td>长期保存，直到你要求删除或本站不再运营</td></tr>
-                <tr><td>IP 地址</td><td><strong>本站不保存</strong>（统计服务由平台按其政策处理）</td></tr>
+                <tr><td>评论（昵称、邮箱、内容、删除令牌）</td><td>长期保存，直至访客或站长请求删除，或本站停止运营</td></tr>
+                <tr><td>IP 地址（用于页面水印）</td><td><strong>不保存</strong></td></tr>
+                <tr><td>IP 地址（用于解锁频率限制）</td><td>计数记录按 60 秒滚动窗口更新；连续失败产生的锁定状态最长保留 10 分钟，到期失效。相关记录不另行归档</td></tr>
                 <tr><td>设备时区</td><td><strong>不保存</strong></td></tr>
                 <tr><td>统计 Cookie（<code>_ga*</code>）</td><td>最长 2 年，随浏览器数据一并清除</td></tr>
-                <tr><td>浏览器本地存储</td><td>由你控制，清除即消失</td></tr>
+                <tr><td>浏览器本地存储</td><td>由访客自行控制，清除即移除</td></tr>
               </tbody>
             </table></div>
 
-            <h2 id="rights">八、你可以怎么做</h2>
+            <h2 id="rights">八、访客的权利与行使方式</h2>
             <ul>
-              <li><strong>查看</strong>：你可以邮件询问本站是否存有你的评论数据。</li>
-              <li><strong>删除</strong>：发表评论后，浏览器会保存一个删除凭证，你可以凭它在页面上自行删除自己的评论。也可以直接邮件联系我删除。</li>
-              <li><strong>撤回</strong>：清除浏览器数据即可移除主题偏好与删除凭证。若你希望删除数据库中的评论与邮箱，请邮件告知。</li>
-              <li><strong>反对</strong>：如你不希望 IP 被读取用于水印，可使用代理或屏蔽页面水印元素，本站不会因此限制你访问任何内容。</li>
-              <li><strong>改变统计选择</strong>：清除浏览器的 <code>analytics-consent</code> 存储项后刷新页面，即可重新选择同意或拒绝。</li>
+              <li><strong>查阅</strong>：可通过邮件询问本站是否留存其评论数据。</li>
+              <li><strong>删除</strong>：发表评论后，浏览器会保存删除令牌，可凭其在页面上自行删除该评论；亦可邮件请求删除。</li>
+              <li><strong>撤回</strong>：清除浏览器数据即可移除主题偏好与删除令牌。如需删除数据库中的评论与邮箱，请以邮件提出，站长核实身份后处理。</li>
+              <li><strong>拒绝</strong>：如不希望 IP 被读取用于水印，可使用代理或屏蔽对应页面元素，本站不会因此限制访问。</li>
+              <li><strong>变更统计选择</strong>：清除 <code>analytics-consent</code> 存储项后刷新页面，可重新选择同意或拒绝。</li>
             </ul>
-            <p>联系邮箱：<a href={MAILTO}>{EMAIL}</a></p>
-            <blockquote>提示：点击邮箱地址会调起你系统里默认的邮件应用。若没有反应，说明设备上未设置默认邮件客户端，可先复制地址再从网页版邮箱发送。</blockquote>
+            <p>联系方式：<a href={MAILTO}>{EMAIL}</a></p>
+            <blockquote>点击邮箱地址将调起系统默认邮件客户端；若设备未设置默认客户端则无响应，可复制地址后通过网页版邮箱发送。</blockquote>
 
-            <h2 id="crossborder">九、关于跨境与未成年人</h2>
+            <h2 id="crossborder">九、跨境传输与未成年人</h2>
             <ul>
-              <li>本站数据存储于境外云服务（Supabase 与 Cloudflare 的全球节点）。若你同意加载 Google Analytics，相关统计数据还会传至 Google（美国）。</li>
-              <li>相关数据可能在你所在国家/地区之外处理。</li>
-              <li>本站是个人内容站点，不面向未成年人定向收集信息，也不会主动收集任何人的敏感个人信息（如身份证号、生物特征、精确地理位置等）。</li>
+              <li>本站数据存储于境外云服务（Supabase 与 Cloudflare 的全球节点）。如访客同意加载 Google Analytics，相关统计数据将传至 Google（美国）。</li>
+              <li>上述数据可能在访客所在国家或地区之外处理。</li>
+              <li>本站为个人内容站点，不面向未成年人定向收集信息，亦不主动收集任何人的敏感个人信息（如身份证件号码、生物识别信息、精确地理位置等）。</li>
+              <li>不满 14 周岁的未成年人，应在监护人同意后使用评论功能；站长获悉相关信息系未经监护人同意而收集时，将予以删除。</li>
             </ul>
 
             <h2 id="changes">十、本说明的变更</h2>
@@ -216,29 +228,30 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
           </Fragment>
         ) : (
           <Fragment>
-            <h2 id="collect">1. What I collect</h2>
+            <h2 id="collect">1. Information collected</h2>
             <h3>Provided by you</h3>
             <div class="table-wrap"><table>
               <thead>
-                <tr><th>Data</th><th>When</th><th>Required</th></tr>
+                <tr><th>Data</th><th>Occasion</th><th>Required</th></tr>
               </thead>
               <tbody>
-                <tr><td>Display name</td><td>When posting a comment</td><td>Required</td></tr>
-                <tr><td>Email address</td><td>When posting a comment</td><td>Required, but <strong>never shown publicly</strong></td></tr>
-                <tr><td>Comment text</td><td>When posting a comment</td><td>Required, max 1,000 characters</td></tr>
+                <tr><td>Display name</td><td>Posting a comment</td><td>Required</td></tr>
+                <tr><td>Email address</td><td>Posting a comment</td><td>Required; not displayed publicly on any page</td></tr>
+                <tr><td>Comment text</td><td>Posting a comment</td><td>Required; maximum 1,000 characters</td></tr>
               </tbody>
             </table></div>
+            <p>Submitted comments enter a moderation queue and are published only after the site owner approves them; rejected comments are not displayed. The system also generates a random deletion token for each comment, enabling you to delete that comment later.</p>
             <h3>Read automatically when you visit</h3>
             <div class="table-wrap"><table>
               <thead>
                 <tr><th>Data</th><th>Purpose</th><th>Stored?</th></tr>
               </thead>
               <tbody>
-                <tr><td>IP address</td><td>Generates the page watermark for provenance</td><td><strong>No</strong></td></tr>
-                <tr><td>Device time zone</td><td>Makes the watermark show your local date</td><td><strong>No</strong></td></tr>
+                <tr><td>IP address</td><td>Generating the provenance watermark; rate limiting for unlock attempts and certain endpoints</td><td>Not stored for watermark purposes; stored temporarily for rate limiting, see Section 5</td></tr>
+                <tr><td>Device time zone</td><td>Displaying the visitor's local date on the watermark</td><td><strong>No</strong></td></tr>
               </tbody>
             </table></div>
-            <blockquote>These two are read at render time only to assemble the watermark text. They are <strong>never written to the database, never written to access logs, and never sent to any third party.</strong></blockquote>
+            <blockquote>For watermark purposes, the IP address and device time zone are read at render time only, used to compose the watermark text, and are not written to the database, written to application logs, or sent to any third party. Rate limiting is handled differently; see Section 5.</blockquote>
             <h3>Involving only the site owner</h3>
             <p>The admin panel uses Supabase authentication, and only the site owner has an account. Passwords are stored as one-way hashes. Visitors need no account and no login to read or comment.</p>
 
@@ -248,83 +261,96 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><th>Data</th><th>Purpose</th><th>Used for anything else?</th></tr>
               </thead>
               <tbody>
-                <tr><td>Display name</td><td>Shown next to your comment</td><td>No</td></tr>
-                <tr><td>Email address</td><td>Identifies the commenter; used to contact you if a dispute arises</td><td><strong>Never published, never used for marketing, never shared or sold</strong></td></tr>
-                <tr><td>Comment text</td><td>Displayed publicly under the relevant post</td><td>No</td></tr>
-                <tr><td>IP address</td><td><strong>Only</strong> to build the watermark label; analytics services handle it separately, see §6</td><td>No profiling, no history retained by this site</td></tr>
-                <tr><td>Time zone</td><td><strong>Only</strong> to compute the local date on the watermark</td><td>Same as above</td></tr>
+                <tr><td>Display name</td><td>Displayed publicly alongside the comment</td><td>No</td></tr>
+                <tr><td>Email address</td><td>Identifying the commenter; contacting the commenter in the event of a dispute</td><td><strong>Not displayed publicly, not used for marketing, not provided to third parties, not sold</strong></td></tr>
+                <tr><td>Comment text</td><td>Displayed publicly under the relevant post once approved</td><td>No</td></tr>
+                <tr><td>IP address</td><td>Generating the provenance watermark; rate limiting for unlock attempts and certain endpoints (see Section 5)</td><td>Not used for profiling; no access history retained by this site</td></tr>
+                <tr><td>Time zone</td><td><strong>Solely</strong> to compute the local date shown on the watermark</td><td>Same as above</td></tr>
               </tbody>
             </table></div>
-            <p>This site does <strong>not</strong> do: user profiling, behavioural analytics, interest tagging, personalised recommendations, ad targeting, or data trading.</p>
+            <p>This site does not carry out user profiling, behavioural analysis, interest tagging, personalised recommendations, advertising, or data trading.</p>
 
             <h2 id="watermark">3. About the page watermark</h2>
-            <p>You may notice faint diagonal text overlaid on the page. This is a provenance watermark.</p>
+            <p>Pages on this site carry a low-opacity overlay of diagonal text, serving as a provenance mark.</p>
             <ul>
-              <li><strong>Content</strong>: <code>IP label · your local date · site name</code></li>
-              <li><strong>Purpose</strong>: if content is copied wholesale or screenshots circulate, it helps identify the source. It is a minimal safeguard for original writing.</li>
-              <li><strong>What it does not do</strong>: it does not record your browsing path, build a profile, link your visits to data generated on this page, or share anything with third parties (the analytics services are covered separately in §6).</li>
-              <li><strong>Visibility</strong>: low opacity — essentially invisible while reading, and it never blocks clicks or text selection.</li>
+              <li><strong>Composition</strong>: <code>IP label · visitor's local date · site name</code>
+                <ul>
+                  <li>IPv4 addresses are shown in full; IPv6 addresses are truncated to the first four segments (e.g. <code>240e:39e:490:b5b1</code>) to limit length</li>
+                </ul>
+              </li>
+              <li><strong>Purpose</strong>: to identify the source of leakage where content is reproduced in full or screenshots circulate; a minimal protective measure for original content.</li>
+              <li><strong>Limits of processing</strong>: no browsing history is recorded, no personal profile is created, the label is not linked to other access data, and it is not provided to third parties (analytics services are addressed separately in Section 6).</li>
+              <li><strong>Visibility</strong>: opacity is low, so it is not readily apparent during normal reading and does not interfere with clicking or text selection.</li>
             </ul>
-            <p>If you would rather not see it, a browser extension can hide the element, or you can browse in private mode. Nothing on the site depends on the watermark, so hiding it does not affect your reading.</p>
+            <p>Visitors who prefer not to see the watermark may hide the element with a browser extension or browse in private mode. No functionality depends on the watermark, and hiding it does not affect access to content.</p>
 
             <h2 id="cookies">4. Cookies and local storage</h2>
-            <p>This site uses no <strong>advertising</strong> cookies and does no cross-site tracking. Cookies fall into two groups: <strong>essential</strong> (no consent needed) and <strong>only present after you consent</strong> (Google Analytics).</p>
+            <p>This site uses no advertising cookies and does not carry out cross-site tracking. Cookies fall into two categories: those necessary for site functionality, which require no consent, and those set only after the visitor has consented (Google Analytics).</p>
             <div class="table-wrap"><table class="table-wide">
               <thead>
                 <tr><th>Name</th><th>Type</th><th>Purpose</th><th>Duration</th><th>Consent required</th></tr>
               </thead>
               <tbody>
-                <tr><td><code>unlocked</code></td><td>Cookie</td><td>Remembers that a protected post has been unlocked. Contains a page identifier and a signature — <strong>no personal information</strong></td><td>30 days</td><td>No (functional)</td></tr>
-                <tr><td><code>theme</code></td><td>Browser local storage</td><td>Remembers your dark / light preference</td><td>Until you clear browser data</td><td>No (local only)</td></tr>
-                <tr><td><code>styleblog-my-comments</code></td><td>Browser local storage</td><td>Stores your comment deletion token so you can manage your own comments</td><td>Same as above</td><td>No (local only)</td></tr>
-                <tr><td><code>analytics-consent</code></td><td>Browser local storage</td><td>Remembers your analytics choice (<code>granted</code> / <code>denied</code>) so you are not asked on every visit</td><td>Until you clear browser data</td><td>No (local only)</td></tr>
-                <tr><td><code>_ga</code></td><td>Cookie</td><td>Random identifier Google Analytics uses to distinguish visitors</td><td>Up to 2 years</td><td><strong>Yes</strong> — never written before you accept</td></tr>
-                <tr><td><code>_ga_&lt;container-id&gt;</code></td><td>Cookie</td><td>Google Analytics 4 session state</td><td>Up to 2 years</td><td><strong>Yes</strong> — never written before you accept</td></tr>
+                <tr><td><code>unlocked</code></td><td>Cookie</td><td>Records the unlock status of a protected post; contains a page identifier and a signature, <strong>with no personal information</strong></td><td>30 days</td><td>No (functional)</td></tr>
+                <tr><td><code>theme</code></td><td>Browser local storage</td><td>Stores the visitor's light or dark theme preference</td><td>Until you clear browser data</td><td>No (local only)</td></tr>
+                <tr><td><code>styleblog-my-comments</code></td><td>Browser local storage</td><td>Stores the comment deletion token so the visitor can delete their own comments</td><td>Same as above</td><td>No (local only)</td></tr>
+                <tr><td><code>analytics-consent</code></td><td>Browser local storage</td><td>Stores the visitor's analytics choice (<code>granted</code> / <code>denied</code>) to avoid repeated requests</td><td>Until you clear browser data</td><td>No (local only)</td></tr>
+                <tr><td><code>_ga</code></td><td>Cookie</td><td>Random identifier Google Analytics uses to distinguish visitors</td><td>Up to 2 years</td><td><strong>Yes</strong>; not written without consent</td></tr>
+                <tr><td><code>_ga_&lt;container-id&gt;</code></td><td>Cookie</td><td>Google Analytics 4 session state</td><td>Up to 2 years</td><td><strong>Yes</strong>; not written without consent</td></tr>
               </tbody>
             </table></div>
             <ul>
-              <li>Apart from <code>unlocked</code> and <code>_ga*</code>, which are sent with requests, everything above lives <strong>only in your browser</strong>.</li>
-              <li>Clearing browser data removes them all, with no effect on reading.</li>
-              <li><code>unlocked</code> is <code>HttpOnly</code> and <code>SameSite=Lax</code>: scripts cannot read it, and it is used only to check unlock status.</li>
+              <li>Apart from <code>unlocked</code> and <code>_ga*</code>, which are sent with requests, all entries above reside only in the visitor's browser and are not uploaded to any server.</li>
+              <li>Clearing browser data removes them all, with no effect on access to content.</li>
+              <li><code>unlocked</code> is set with the <code>HttpOnly</code> and <code>SameSite=Lax</code> attributes; it cannot be read by page scripts and is used solely to determine unlock status. Its lifetime is 30 days.</li>
+              <li>Regarding comment deletion tokens: in addition to the copy held in browser storage, the token is also retained in the site database as part of the comment record (field <code>delete_token</code>), so that the server can verify authority for deletion requests. The token is a random string containing no visitor identity information and is removed together with the comment.</li>
             </ul>
 
             <h2 id="thirdparty">5. Third-party services involved</h2>
-            <p>There is no self-hosted server; the data path involves:</p>
+            <p>This site does not operate its own server; all requests are handled through the third-party services listed below. In addition, rate limiting for unlock attempts on protected posts, and for the translation and excerpt endpoints, writes visitors' IP addresses to the site database, as described at the end of this section.</p>
             <div class="table-wrap"><table>
               <thead>
                 <tr><th>Service</th><th>Role</th><th>Data involved</th></tr>
               </thead>
               <tbody>
-                <tr><td>Cloudflare</td><td>Hosting, global content delivery, <strong>Web Analytics</strong></td><td>Request routing; analytics uses no cookies and no fingerprinting (the platform handles network-level logs under its own policies)</td></tr>
-                <tr><td>Supabase</td><td>Database and authentication</td><td>Posts, comments, site owner account</td></tr>
+                <tr><td>Cloudflare</td><td>Hosting, global content delivery, <strong>Web Analytics</strong></td><td>Request routing; analytics uses no cookies and no device fingerprinting (the platform handles network-level logs under its own policies)</td></tr>
+                <tr><td>Supabase</td><td>Database, authentication, and object storage</td><td>Posts, comments (including display name, email, and deletion token), site owner account, and rate-limiting records (including IP addresses)</td></tr>
                 <tr><td>GitHub</td><td>Code hosting</td><td>No visitor data</td></tr>
-                <tr><td><strong>Google Analytics</strong> (optional)</td><td>Visit analytics</td><td><strong>Loaded only after you click "Accept"</strong>; data is transferred to Google (United States)</td></tr>
+                <tr><td>Zhipu GLM (bigmodel.cn)</td><td>Language model service used by the site owner when drafting and translating posts</td><td>Processes only text submitted by the site owner; no visitor data</td></tr>
+                <tr><td><strong>Google Analytics</strong> (optional)</td><td>Visit analytics</td><td><strong>Loaded only after the visitor clicks "Accept"</strong>; data is transferred to Google (United States)</td></tr>
               </tbody>
             </table></div>
-            <p><strong>Not used</strong>: Baidu Analytics, Umeng, 51LA or other Chinese analytics platforms; <strong>no ad networks, affiliate marketing, or behavioural tracking scripts of any kind</strong>.</p>
+            <p>This site does not use Baidu Analytics, Umeng, 51LA or other Chinese analytics platforms, and carries no advertising networks, affiliate marketing, or behavioural tracking scripts.</p>
+            <h3>Temporary storage of IP addresses</h3>
+            <p>To prevent brute-force attempts and endpoint abuse, the following operations write the visitor's IP address to the site database:</p>
+            <ul>
+              <li><strong>Unlocking a protected post</strong>: keyed as <code>rl:unlock:ip:&lt;IP address&gt;</code>, recording request counts and failure counts in order to limit attempt frequency and impose a temporary lock after repeated failures;</li>
+              <li><strong>Translation and excerpt endpoints</strong>: counted per account identifier; no separate IP record is kept.</li>
+            </ul>
+            <p>Unlock-related records are held in the <code>rate_limit_state</code> and <code>unlock_fail_state</code> tables, keyed by plaintext IP address, for the purpose of rolling counting windows. Such records are not linked to comments, email addresses, or other identity information, are not used for profiling, and are retained as described in Section 7.</p>
 
-            <h2 id="analytics">6. Analytics and your choice</h2>
-            <p>The purpose of the analytics on this site is to <strong>understand traffic, as well as engagement and retention</strong> — specifically, to learn which posts are actually being read, where readers come from, whether they go on to read more after finishing one piece, and whether they come back after a while. That information is used only to decide what to write and how to improve the site, and for nothing else.</p>
-            <p>This site uses two analytics services with very different properties — please read them separately.</p>
-            <h3>1. Cloudflare Web Analytics (always on, no consent needed)</h3>
+            <h2 id="analytics">6. Analytics and visitors' choices</h2>
+            <p>Analytics on this site is used solely to understand traffic and the engagement and retention of content: which posts are actually read, where visitors come from, whether they move on to other posts, and whether they return. Such information is used only to determine content direction and improvements, and for no other purpose.</p>
+            <p>Two analytics services are in use. They differ in nature and should be understood separately.</p>
+            <h3>1. Cloudflare Web Analytics (always enabled, no consent required)</h3>
             <ul>
               <li>No cookies, no local storage, no device fingerprinting.</li>
-              <li>Records aggregated page-level metrics: page views, referrers, country/region, and page performance.</li>
-              <li>Cloudflare states that Web Analytics does not collect or use visitors' personal data and does not use cookies or device fingerprinting for analytics. It runs independently of the optional Google Analytics service and has no separate opt-out control on this site.</li>
+              <li>Records aggregated page-level metrics only: page views, referrers, country or region, and page performance.</li>
+              <li>According to Cloudflare, Web Analytics does not collect or use visitors' personal data and does not use cookies or device fingerprinting for analytics. It operates independently of the optional Google Analytics service, and this site provides no separate switch for it.</li>
             </ul>
-            <h3>2. Google Analytics (not loaded by default, requires your consent)</h3>
+            <h3>2. Google Analytics (not loaded by default; consent required)</h3>
             <ul>
-              <li>On your first visit, a banner appears at the bottom of the page asking whether Google Analytics may be loaded.</li>
+              <li>On the first visit, a notice appears at the bottom of the page asking whether Google Analytics may be loaded.</li>
               <li>Neither option is preselected, and both buttons are equally prominent.</li>
-              <li><strong>Before you click "Accept", the Google Analytics script is not downloaded at all</strong> — it is not a matter of loading then blocking; the request is never made.</li>
-              <li>If you decline, Google Analytics is never loaded, and no site feature is affected.</li>
-              <li>Either way, your choice is stored locally in your browser, so you will not be asked again. Clearing browser data resets the question.</li>
-              <li>Once you accept, Google Analytics can measure page views, sessions, average engagement time, bounce behaviour, and the ratio of new to returning visitors. Google Analytics uses IP addresses at collection time for basic service functions and approximate location reporting, but does not log or store the raw IP addresses. The data is not used for advertising or cross-site retargeting through this site.</li>
+              <li>Before the visitor clicks "Accept", the Google Analytics script is neither downloaded nor requested; it is not a case of loading first and blocking reporting afterwards.</li>
+              <li>If the visitor declines, Google Analytics is never loaded and no site functionality is affected.</li>
+              <li>Whichever option is chosen, the choice is stored in browser local storage and the question is not asked again; clearing browser data causes the question to be asked again.</li>
+              <li>After consent, the metrics measured include page views, sessions, average engagement time, bounce behaviour, and the ratio of new to returning visitors. IP anonymisation (<code>anonymize_ip</code>) is enabled on this site. Google Analytics uses IP addresses at collection time to provide the basic service and to determine approximate location, but does not record or store full IP addresses. The data is not used for advertising or cross-site targeting.</li>
             </ul>
-            <h3>3. The practical experience for visitors in mainland China</h3>
-            <p>The Google Analytics script lives on <code>googletagmanager.com</code>, which <strong>may fail to load or be very slow on some networks in mainland China</strong>. Even if you accept, no data may be reported — that is a network limitation, not something this site does. It is also why Cloudflare Web Analytics remains necessary: it is the only channel through which visitors in mainland China can be reliably counted.</p>
-            <h3>4. You can change your mind</h3>
-            <p>Clearing local storage (or using a private window) brings the question back. To reverse an earlier "Accept", remove the <code>analytics-consent</code> entry and reload the page, then choose "Decline".</p>
+            <h3>3. Conditions on networks in mainland China</h3>
+            <p>The Google Analytics script is served from <code>googletagmanager.com</code>, which may fail to load or load slowly on some networks in mainland China. In such cases no data is reported even where the visitor has consented; this results from network conditions rather than the conduct of this site. It is also why Cloudflare Web Analytics is retained: it is the channel through which visitors in mainland China can be reliably counted.</p>
+            <h3>4. Changing the analytics choice</h3>
+            <p>Clearing browser local storage, or using a private window, causes the question to be asked again. To withdraw a previous consent, remove the <code>analytics-consent</code> entry and reload the page, then select "Decline".</p>
 
             <h2 id="retention">7. How long data is kept</h2>
             <div class="table-wrap"><table>
@@ -332,30 +358,32 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><th>Data</th><th>Retention</th></tr>
               </thead>
               <tbody>
-                <tr><td>Comments (name, email, text)</td><td>Kept long-term until you request deletion or the site closes</td></tr>
-                <tr><td>IP address</td><td><strong>Not retained by this site</strong> (analytics platforms handle it under their own policies)</td></tr>
+                <tr><td>Comments (name, email, text, deletion token)</td><td>Retained long-term until the visitor or the site owner requests deletion, or until the site ceases operation</td></tr>
+                <tr><td>IP address (page watermark)</td><td><strong>Not retained</strong></td></tr>
+                <tr><td>IP address (unlock rate limiting)</td><td>Count records are updated within a rolling 60-second window; lock states resulting from repeated failures are retained for no longer than 10 minutes and then expire. Such records are not archived separately</td></tr>
                 <tr><td>Time zone</td><td><strong>Not retained</strong></td></tr>
                 <tr><td>Analytics cookies (<code>_ga*</code>)</td><td>Up to 2 years; removed with browser data</td></tr>
                 <tr><td>Browser local storage</td><td>Under your control — clearing removes it</td></tr>
               </tbody>
             </table></div>
 
-            <h2 id="rights">8. What you can do</h2>
+            <h2 id="rights">8. Visitors' rights and how to exercise them</h2>
             <ul>
-              <li><strong>Ask</strong>: email me to ask whether any comment data of yours is stored.</li>
-              <li><strong>Delete</strong>: after posting, your browser holds a deletion token that lets you remove your own comment on the page. You can also simply email me.</li>
-              <li><strong>Withdraw</strong>: clearing browser data removes your theme preference and deletion token. To remove comments and email from the database, email me.</li>
-              <li><strong>Object</strong>: if you would rather your IP were not read for the watermark, use a proxy or hide the watermark element. The site will not restrict your access as a result.</li>
-              <li><strong>Change your analytics choice</strong>: clear the <code>analytics-consent</code> entry in your browser and reload the page to choose again.</li>
+              <li><strong>Access</strong>: visitors may request by email whether comment data relating to them is held.</li>
+              <li><strong>Deletion</strong>: after posting a comment, the browser stores a deletion token with which the comment can be deleted on the page; deletion may also be requested by email.</li>
+              <li><strong>Withdrawal</strong>: clearing browser data removes the theme preference and deletion token. To have comments and email addresses removed from the database, a request should be made by email; the site owner will verify the request before acting.</li>
+              <li><strong>Objection</strong>: visitors who do not wish their IP address to be read for the watermark may use a proxy or hide the corresponding page element; access will not be restricted as a result.</li>
+              <li><strong>Changing the analytics choice</strong>: removing the <code>analytics-consent</code> entry and reloading the page allows the choice to be made again.</li>
             </ul>
             <p>Contact: <a href={MAILTO}>{EMAIL}</a></p>
-            <blockquote>Tip: clicking the address opens your system's default mail app. If nothing happens, no default mail client is configured — copy the address and send from a web mail service instead.</blockquote>
+            <blockquote>Clicking the address opens the system's default mail client. If the device has no default client configured, nothing will happen; in that case, copy the address and send from a web mail service.</blockquote>
 
             <h2 id="crossborder">9. Cross-border transfers and minors</h2>
             <ul>
-              <li>Data is stored on cloud services outside mainland China (Supabase and Cloudflare global nodes). If you consent to Google Analytics, related analytics data is also transferred to Google (United States).</li>
-              <li>Relevant data may be processed outside your country or region.</li>
-              <li>This is a personal content site. It does not knowingly collect information from minors, and it does not collect sensitive personal information (such as ID numbers, biometrics, or precise location).</li>
+              <li>Data is stored on cloud services outside mainland China (Supabase and Cloudflare global nodes). Where the visitor consents to Google Analytics, related analytics data is also transferred to Google (United States).</li>
+              <li>Such data may be processed outside the visitor's country or region.</li>
+              <li>This is a personal content site. It does not collect information from minors in a targeted manner, and does not collect sensitive personal information (such as identity document numbers, biometric data, or precise location).</li>
+              <li>Minors under the age of 14 should use the comment function only with the consent of a guardian. Where the site owner learns that such information was collected without guardian consent, it will be deleted.</li>
             </ul>
 
             <h2 id="changes">10. Changes to this notice</h2>

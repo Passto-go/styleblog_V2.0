@@ -4,82 +4,343 @@ import Base from '../../layouts/Base.astro';
 const { lang } = Astro.props;
 const year = new Date().getFullYear();
 const EMAIL = 'intl1024@outlook.com';
-const MAILTO = `mailto:${EMAIL}?subject=${encodeURIComponent(lang === 'zh' ? '版权相关事宜' : 'Copyright inquiry')}`;
+const MAILTO = `mailto:${EMAIL}?subject=${encodeURIComponent(lang === 'zh' ? '版权与许可相关事宜' : 'Copyright & licensing inquiry')}`;
 const WEBMAIL = `https://outlook.live.com/mail/0/deeplink/compose?to=${EMAIL}`;
 
-// B 方案版权说明：自定义、非 CC、零域名。
-// 署名用作者身份（老一贯 / Lao Yiguan）与品牌名（吾道一以贯之 / The Way, One Thread），
-// 不出现站点域名；年份动态生成；出链一律走相对路径 /copyright，跟随域名变化。
+// B 方案：自定义授权（非 CC），署名用作者身份与品牌名，不出现站点域名；
+// 年份动态生成；页内链接一律走相对路径，跟随域名变化。
+// 依赖清单以 package.json 与 wrangler.toml 的真实配置为准（均为 MIT）。
 const CONTENT = {
   zh: {
-    title: '版权与转载说明',
-    lead: '本站内容的著作权归属与转载规则。',
-    blocks: [
-      { tag: 'p', html: '本站（吾道一以贯之）全部原创文章、图片与代码的著作权归 <strong>老一贯</strong> 所有。' },
-      { tag: 'h2', text: '欢迎的做法' },
-      { tag: 'p', html: '非商业用途的引用与分享：引用片段请注明作者与原文链接；分享至社交平台请保留出处。' },
-      { tag: 'h2', text: '未经许可，禁止' },
-      { tag: 'p', html: '1. 整篇或实质性转载（含镜像、聚合、转码后发布）；' },
-      { tag: 'p', html: '2. 任何形式的商业化使用（付费墙、广告变现、二次出售）；' },
-      { tag: 'p', html: '3. 去除署名或篡改内容后重新发布。' },
-      { tag: 'h2', text: '关于 AI 与数据挖掘' },
-      { tag: 'p', html: '未经授权，请勿将本站内容用于模型训练、数据挖掘或类似自动化抓取。' },
-      { tag: 'h2', text: '侵权举报' },
-      { tag: 'p', html: '如发现未经授权的转载或滥用，请通过邮件联系站长，并附上侵权页面链接，我们将在核实后处理：' },
-      { tag: 'contact' },
-      { tag: 'p', html: `© ${year} 老一贯（吾道一以贯之）。保留署名权。` },
+    title: '版权与许可声明',
+    lead: '本页载明本站内容、源代码及所使用第三方资源的授权范围。',
+    updated: '最近更新：2026 年 11 月 6 日',
+    sections: [
+      {
+        h2: '一、内容版权',
+        blocks: [
+          { p: '本站（吾道一以贯之）刊载的文章、随笔、图片及页面版式设计，其著作权归 <strong>老一贯</strong> 所有，自发布之日起受著作权法保护。' },
+          { p: '本站<strong>内容</strong>采用自定义授权规则，未采用知识共享（Creative Commons）协议；源代码另行按 CC BY-NC-SA 4.0 授权，见第四节。以下就内容部分分别列明无需事先授权的使用与须事先取得授权的使用。' },
+        ],
+      },
+      {
+        h2: '二、无需事先授权的使用',
+        blocks: [
+          {
+            ul: [
+              '引用：在文章、书评、课程或社交平台中引用段落，须注明作者「老一贯」并附原文链接。',
+              '分享：将文章链接转发至任何平台，无需事先授权，保留出处即可。',
+              '个人使用：为个人学习目的进行打印、存档、笔记摘录或离线阅读。',
+            ],
+          },
+          { note: '引用不得歪曲原意。截取片段并改变其语境，即使附有原文链接，亦不视为适当引用。' },
+        ],
+      },
+      {
+        h2: '三、须事先取得授权的使用',
+        blocks: [
+          {
+            ul: [
+              '全文或实质性部分的转载，包括镜像站、内容聚合，以及转换为音频、视频后重新发布；',
+              '任何形式的商业利用，例如设置付费墙、广告分成、打包出售或用于收费培训；',
+              '去除署名，或改动标题、正文后重新发布；',
+              '用于训练机器学习模型、构建数据集，或实施大规模自动化抓取。',
+            ],
+          },
+          { p: '上述情形须事先取得书面授权。请以邮件说明使用方式、范围与用途，站长收到后将视情形回复。' },
+        ],
+      },
+      {
+        h2: '四、源代码与代码许可',
+        blocks: [
+          { p: '本站前端与后端源代码由站长编写与维护，开发过程中参考并使用了若干开源项目。除下列第三方组件外，自有源代码依 <strong>CC BY-NC-SA 4.0</strong>（署名—非商业性使用—相同方式共享 4.0 国际）许可发布，许可全文见仓库根目录的 <code>LICENSE</code> 文件。' },
+          { p: '在遵守下列条件的前提下，可对源代码进行复制、修改与分发：' },
+          {
+            ul: [
+              '<strong>署名</strong>：保留作者署名「老一贯」与许可说明，并附上原仓库地址；如有修改，需注明已修改。',
+              '<strong>非商业</strong>：不得将源代码或其衍生作品用于商业目的，包括销售、付费分发，以及以此作为收费服务的主要卖点。',
+              '<strong>相同方式共享</strong>：分发修改后的代码时，须继续使用 CC BY-NC-SA 4.0 或与之兼容的许可。',
+            ],
+          },
+          { note: '该许可仅适用于源代码。文章、图片与页面版式的授权依第一节所述自定义条款处理，二者并行适用，互不替代。' },
+          { note: '该许可含非商业性使用限制，不属于 OSI 定义的开源许可，准确的表述为「源码公开（source-available）」。此外，CC 许可一经授予即不可撤销：已依该许可取得源代码者，可在许可范围内持续使用。' },
+        ],
+      },
+      {
+        h2: '五、第三方开源组件',
+        blocks: [
+          { p: '本站由以下开源项目构建。它们均以 <strong>MIT</strong> 许可发布，版权归各自作者所有，本站按 MIT 许可的要求保留其版权与许可声明。' },
+          {
+            table: {
+              head: ['组件', '版本', '许可', '在本站的作用'],
+              rows: [
+                ['Astro', '7.3.8', 'MIT', '站点框架与构建'],
+                ['@astrojs/cloudflare', '14.3.0', 'MIT', 'Cloudflare Workers 部署适配'],
+                ['@astrojs/rss', '4.x', 'MIT', 'RSS 订阅生成'],
+                ['@astrojs/sitemap', '3.x', 'MIT', '站点地图生成'],
+                ['@supabase/supabase-js', '2.x', 'MIT', '数据库、登录、存储与实时评论'],
+                ['marked', '12.x', 'MIT', 'Markdown 正文渲染'],
+                ['qrcode', '1.5.x', 'MIT', '分享二维码生成'],
+              ],
+            },
+          },
+          { note: '以上项目自身还引用了若干传递依赖，同样遵循各自的开源许可。完整许可文本可在对应项目的仓库或依赖目录中查阅。' },
+        ],
+      },
+      {
+        h2: '六、托管与第三方服务',
+        blocks: [
+          {
+            ul: [
+              '<strong>Cloudflare</strong>：提供页面托管、CDN 与 Workers 运行环境。',
+              '<strong>Supabase</strong>：提供数据库、账户登录、对象存储与实时评论通道。',
+              '<strong>智谱 GLM（bigmodel.cn）</strong>：站长在后台撰写与翻译文章时，用以辅助生成译文与摘要；该服务仅处理站长提交的文本，不涉及访客输入内容。',
+              '<strong>Outlook</strong>：用于版权与投诉邮件的收发。',
+            ],
+          },
+          { note: '上述服务由各自运营商提供，受其服务条款与隐私政策约束。其服务调整与数据存储方式不在本站控制范围之内。' },
+        ],
+      },
+      {
+        h2: '七、字体、图标与图片',
+        blocks: [
+          {
+            ul: [
+              '字体：使用设备内置的系统字体（如苹方、微软雅黑、Segoe UI 等），未加载任何第三方网络字体。',
+              '图标：界面图标为本站自行绘制的内联 SVG，不依赖第三方图标库。',
+              '品牌标识：GitHub、微信、X、QQ、微博、Telegram、WhatsApp、Facebook、TikTok 等图标为相应权利人的商标，本站仅用于指向对应平台或账号，不表示任何隶属、合作或背书关系。',
+              '图片：站点头像、站点图标（favicon）与默认分享图均由站长制作。',
+            ],
+          },
+        ],
+      },
+      {
+        h2: '八、免责声明',
+        blocks: [
+          {
+            ul: [
+              '本站内容按「现状」提供。站长将尽力保证内容准确，但不保证其完整、及时，亦不保证其适用于特定情形。',
+              '文章中的观点为个人看法。涉及法律、医疗、投资等内容仅供交流，不构成专业建议。',
+              '站内指向的外部链接由第三方维护，本站无法保证其内容与安全性，亦不承担责任。',
+              'AI 辅助生成的译文与摘要可能存在偏差，应以中文原文为准。',
+              '在法律允许的范围内，因使用或依赖本站内容而产生的任何直接或间接损失，本站及作者不承担责任。',
+            ],
+          },
+          { p: '如认为本站内容侵害其权利，可提供具体链接与权属证明，站长核实后将予处理。' },
+        ],
+      },
+      {
+        h2: '九、声明的变更',
+        blocks: [
+          { p: '本声明可能随站点调整而修订，修订后于本页顶部标注「最后更新」日期。涉及授权范围实质性变化的，将在首页或文章中另行说明。修订后继续使用本站，视为接受修订后的条款。' },
+        ],
+      },
     ],
+    contactTitle: '十、联系',
+    contactLead: '版权授权、侵权投诉及其他与本声明相关的事宜，可通过下列邮箱联系站长。',
+    signature: `© ${year} 老一贯（吾道一以贯之）。内容保留所有权利；源代码按 CC BY-NC-SA 4.0 授权。`,
   },
   en: {
-    title: 'Copyright & Republishing',
-    lead: 'How the content on this site is licensed and may be shared.',
-    blocks: [
-      { tag: 'p', html: 'All original articles, images, and code on this site (The Way, One Thread) are the intellectual property of <strong>Lao Yiguan</strong>.' },
-      { tag: 'h2', text: 'What you may do' },
-      { tag: 'p', html: 'Quote short excerpts for non-commercial purposes, with clear attribution and a link to the original; sharing on social platforms is welcome with credit kept intact.' },
-      { tag: 'h2', text: 'Without permission, you may not' },
-      { tag: 'p', html: '1. Repost entire posts or substantial portions (including mirroring, aggregation, or republishing after transcoding);' },
-      { tag: 'p', html: '2. Use the content commercially in any form (paywalls, ad monetization, resale);' },
-      { tag: 'p', html: '3. Strip attribution or alter and redistribute the content.' },
-      { tag: 'h2', text: 'AI & data mining' },
-      { tag: 'p', html: 'Automated scraping or training of models on this content is not permitted without authorization.' },
-      { tag: 'h2', text: 'Report infringement' },
-      { tag: 'p', html: 'To report unauthorized use, email the site owner with a link to the infringing page. We will act upon verification:' },
-      { tag: 'contact' },
-      { tag: 'p', html: `© ${year} Lao Yiguan (The Way, One Thread). Attribution rights reserved.` },
+    title: 'Copyright & License',
+    lead: 'The licensing terms applicable to the content, source code, and third-party resources used by this site.',
+    updated: 'Last updated: November 7, 2026',
+    sections: [
+      {
+        h2: '1. Copyright of content',
+        blocks: [
+          { p: 'All articles, essays, images, and the page designs on this site (The Way, One Thread) are the intellectual property of <strong>Lao Yiguan</strong>, protected by copyright from the day they are published.' },
+          { p: 'The <strong>content</strong> of this site is governed by custom terms and is not licensed under a Creative Commons license; the source code is licensed separately under CC BY-NC-SA 4.0 (see Section 4). The following sets out uses permitted without prior authorisation and uses requiring prior authorisation.' },
+        ],
+      },
+      {
+        h2: '2. Uses permitted without prior authorisation',
+        blocks: [
+          {
+            ul: [
+              'Quotation: quoting passages in articles, reviews, courses, or on social platforms, provided the author “Lao Yiguan” is credited and a link to the original is included.',
+              'Sharing: forwarding a link to any platform without prior authorisation, provided the source is retained.',
+              'Personal use: printing, archiving, note-taking, or offline reading for personal study.',
+            ],
+          },
+          { note: 'Quotation must not distort the original meaning. Extracting a fragment and altering its context does not constitute proper quotation, even where a link to the original is included.' },
+        ],
+      },
+      {
+        h2: '3. Uses requiring prior authorisation',
+        blocks: [
+          {
+            ul: [
+              'Reproduction of a complete post or substantial portions thereof, including mirror sites, content aggregation, and republication after conversion to audio or video;',
+              'Any commercial exploitation, including paywalls, advertising revenue sharing, resale, or use in paid training;',
+              'Removing attribution, or altering the title or body before republishing;',
+              'Training machine-learning models, constructing datasets, or large-scale automated scraping.',
+            ],
+          },
+          { p: 'Prior written authorisation is required for the above. Requests should be sent by email stating the manner, scope, and purpose of use; the site owner will respond as circumstances permit.' },
+        ],
+      },
+      {
+        h2: '4. Source code and code license',
+        blocks: [
+          { p: 'The front-end and back-end source code of this site is written and maintained by the site owner, with reference to and use of several open-source projects. Apart from the third-party components listed below, the owner’s source code is released under <strong>CC BY-NC-SA 4.0</strong> (Attribution-NonCommercial-ShareAlike 4.0 International). The full terms are set out in the <code>LICENSE</code> file at the repository root.' },
+          { p: 'The source code may be copied, modified, and distributed subject to the following conditions:' },
+          {
+            ul: [
+              '<strong>Attribution</strong>: retain the credit “Lao Yiguan” and the license notice, include the original repository address, and indicate any modifications made.',
+              '<strong>NonCommercial</strong>: the source code and any derivative works may not be used for commercial purposes, including sale, distribution for a fee, or use as the principal offering of a paid service.',
+              '<strong>ShareAlike</strong>: modified code, when distributed, must remain under CC BY-NC-SA 4.0 or a compatible license.',
+            ],
+          },
+          { note: 'This license applies to source code only. Articles, images, and page designs are governed by the custom terms in Section 1; the two apply concurrently and neither replaces the other.' },
+          { note: 'As it contains a NonCommercial restriction, this is not an OSI-approved open-source license; the accurate description is “source-available”. CC licenses are also irrevocable once granted: anyone who obtained the code under these terms may continue to use it within their scope.' },
+        ],
+      },
+      {
+        h2: '5. Open-source components',
+        blocks: [
+          { p: 'This site is built with the following open-source projects. All are released under the <strong>MIT</strong> license; copyright belongs to their respective authors, and this site retains their copyright and license notices as MIT requires.' },
+          {
+            table: {
+              head: ['Component', 'Version', 'License', 'Role on this site'],
+              rows: [
+                ['Astro', '7.3.8', 'MIT', 'Site framework and build'],
+                ['@astrojs/cloudflare', '14.3.0', 'MIT', 'Cloudflare Workers deployment adapter'],
+                ['@astrojs/rss', '4.x', 'MIT', 'RSS feed generation'],
+                ['@astrojs/sitemap', '3.x', 'MIT', 'Sitemap generation'],
+                ['@supabase/supabase-js', '2.x', 'MIT', 'Database, auth, storage, and realtime comments'],
+                ['marked', '12.x', 'MIT', 'Markdown rendering'],
+                ['qrcode', '1.5.x', 'MIT', 'Share QR code generation'],
+              ],
+            },
+          },
+          { note: 'These projects in turn depend on transitive packages, each governed by its own open-source license. Full license texts are available in the respective repositories or dependency directories.' },
+        ],
+      },
+      {
+        h2: '6. Hosting and third-party services',
+        blocks: [
+          {
+            ul: [
+              '<strong>Cloudflare</strong>: page hosting, CDN, and the Workers runtime.',
+              '<strong>Supabase</strong>: database, account login, object storage, and the realtime comment channel.',
+              '<strong>Zhipu GLM (bigmodel.cn)</strong>: used by the site owner to assist in drafting and translating posts; it processes only text submitted by the owner and no visitor input.',
+              '<strong>Outlook</strong>: for sending and receiving copyright and complaint emails.',
+            ],
+          },
+          { note: 'These services are provided by their respective operators and are subject to their own terms and privacy policies. Changes to those services and their data storage practices are outside this site’s control.' },
+        ],
+      },
+      {
+        h2: '7. Fonts, icons, and images',
+        blocks: [
+          {
+            ul: [
+              'Fonts: system fonts provided by the visitor’s device (PingFang, Microsoft YaHei, Segoe UI, etc.). No third-party web fonts are loaded.',
+              'Icons: interface icons are inline SVGs drawn by the site owner; no third-party icon library is used.',
+              'Brand marks: the GitHub, WeChat, X, QQ, Weibo, Telegram, WhatsApp, Facebook, and TikTok icons are trademarks of their respective owners. They are used solely to link to the corresponding platform or account and do not indicate any affiliation, partnership, or endorsement.',
+              'Images: the site avatar, favicons, and default share image are produced by the site owner.',
+            ],
+          },
+        ],
+      },
+      {
+        h2: '8. Disclaimer',
+        blocks: [
+          {
+            ul: [
+              'Content is provided “as is”. The site owner seeks to ensure accuracy but does not warrant that the content is complete, current, or suitable for any particular purpose.',
+              'Views expressed are those of the author. Content concerning law, medicine, or investment is provided for discussion only and does not constitute professional advice.',
+              'External links are maintained by third parties; the site owner cannot guarantee their content or security and accepts no responsibility for them.',
+              'AI-assisted translations and summaries may contain inaccuracies; the Chinese original prevails.',
+              'To the extent permitted by law, neither this site nor its author is liable for any direct or indirect loss arising from the use of, or reliance on, its content.',
+            ],
+          },
+          { p: 'Anyone who considers content on this site to infringe their rights may provide the specific link and proof of title; the site owner will act upon verification.' },
+        ],
+      },
+      {
+        h2: '9. Changes to these terms',
+        blocks: [
+          { p: 'These terms may be revised as the site changes, and the “Last updated” date at the top of this page will be amended accordingly. Any material change to the scope of the licence will be noted on the homepage or in a post. Continued use of the site after revision constitutes acceptance of the revised terms.' },
+        ],
+      },
     ],
+    contactTitle: '10. Contact',
+    contactLead: 'For licensing, infringement notices, or other matters relating to these terms, the site owner may be contacted at the address below.',
+    signature: `© ${year} Lao Yiguan (The Way, One Thread). Content all rights reserved; source code licensed under CC BY-NC-SA 4.0.`,
   },
 };
 
 const c = CONTENT[lang] || CONTENT.en;
+// 更新日期：与隐私声明页同口径，格式一致
+const lastUpdated = lang === 'zh' ? '最后更新：2026 年 11 月 7 日' : 'Last updated: 2026-11-07';
 const T = lang === 'zh'
-  ? { copy: '复制邮箱', copied: '已复制', web: '用网页版 Outlook 写信 →', hint: '点击地址将打开你的邮件客户端；若没有反应，可复制邮箱或使用网页版。' }
-  : { copy: 'Copy email', copied: 'Copied', web: 'Compose in Outlook web →', hint: 'Clicking the address opens your mail app. If nothing happens, copy it or use the web version.' };
+  ? { copy: '复制邮箱', copied: '已复制', web: '用网页版 Outlook 写信 →', hint: '点击地址将调起系统默认邮件客户端；若无响应，可复制地址后通过网页版邮箱发送。' }
+  : { copy: 'Copy email', copied: 'Copied', web: 'Compose in Outlook web →', hint: 'Clicking the address opens the system’s default mail client. If nothing happens, copy the address and send from a web mail service.' };
 ---
 <Base lang={lang} title={c.title} description={c.lead}>
   <section class="page">
     <h1 class="page-title">{c.title}</h1>
     <p class="lead">{c.lead}</p>
-    <div class="prose">
-      {c.blocks.map((b) =>
-        b.tag === 'h2'
-          ? <h2>{b.text}</h2>
-          : b.tag === 'contact'
-            ? (
-              <div class="contact-card">
-                <a class="contact-mail" href={MAILTO}>{EMAIL}</a>
-                <button type="button" class="contact-copy" data-copy={EMAIL} data-label-copy={T.copy} data-label-copied={T.copied}>{T.copy}</button>
-                <a class="contact-web" href={WEBMAIL} target="_blank" rel="noopener">{T.web}</a>
-                <p class="contact-hint">{T.hint}</p>
-              </div>
-            )
-            : <p set:html={b.html} />
-      )}
+    <p class="updated">{lastUpdated}</p>
+    <div class="prose license">
+      {c.sections.map((s) => (
+        <>
+          <h2>{s.h2}</h2>
+          {s.blocks.map((b) =>
+            b.p
+              ? <p set:html={b.p} />
+              : b.ul
+                ? <ul>{b.ul.map((li) => <li set:html={li} />)}</ul>
+                : b.note
+                  ? <p class="note">{b.note}</p>
+                  : b.table
+                    ? (
+                      <div class="table-wrap">
+                        <table>
+                          <thead>
+                            <tr>{b.table.head.map((h) => <th>{h}</th>)}</tr>
+                          </thead>
+                          <tbody>
+                            {b.table.rows.map((row) => (
+                              <tr>{row.map((cell) => <td set:html={cell} />)}</tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                    : null
+          )}
+        </>
+      ))}
+      <h2>{c.contactTitle}</h2>
+      <p>{c.contactLead}</p>
+      <div class="contact-card">
+        <a class="contact-mail" href={MAILTO}>{EMAIL}</a>
+        <button type="button" class="contact-copy" data-copy={EMAIL} data-label-copy={T.copy} data-label-copied={T.copied}>{T.copy}</button>
+        <a class="contact-web" href={WEBMAIL} target="_blank" rel="noopener">{T.web}</a>
+        <p class="contact-hint">{T.hint}</p>
+      </div>
+      <p class="signature">{c.signature}</p>
     </div>
   </section>
 </Base>
 
 <style>
+  .updated {
+    color: var(--muted);
+    font-size: 0.875rem;
+    margin: -0.25rem 0 1.5rem;
+  }
+  .license ul { padding-left: 1.15rem; margin: 0.5rem 0 1rem; }
+  .license li { margin: 0.3rem 0; line-height: 1.7; }
+  .note { font-size: 0.875rem; opacity: 0.7; border-left: 3px solid var(--border, #e5e5e5); padding-left: 0.75rem; margin: 0.75rem 0 1rem; }
+  .table-wrap { overflow-x: auto; margin: 0.75rem 0 1rem; }
+  .license table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .license th, .license td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border, #e5e5e5); vertical-align: top; }
+  .license th { font-weight: 600; opacity: 0.85; white-space: nowrap; }
+  .license td:first-child { white-space: nowrap; }
+  .signature { margin-top: 1.75rem; font-size: 0.85rem; opacity: 0.65; }
   .contact-card {
     display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem 0.875rem;
     margin: 1.125rem 0 1.5rem;
