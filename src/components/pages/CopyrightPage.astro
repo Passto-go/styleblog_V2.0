@@ -272,6 +272,33 @@ const CONTENT = {
 };
 
 const c = CONTENT[lang] || CONTENT.en;
+// 目录（Table of Contents）：与隐私说明页一致，章节锚点中英文共用同一组 id。
+// 前 9 项对应 sections，末项对应「联系」；标题直接取 CONTENT，避免与正文标题不同步。
+const SECTION_IDS = [
+  'content-copyright',
+  'permitted-use',
+  'restricted-use',
+  'source-code',
+  'components',
+  'services',
+  'assets',
+  'disclaimer',
+  'changes',
+  'contact',
+];
+const TOC = [
+  ...CONTENT.zh.sections.map((s, i) => ({
+    id: SECTION_IDS[i],
+    zh: s.h2,
+    en: CONTENT.en.sections[i].h2,
+  })),
+  {
+    id: SECTION_IDS[CONTENT.zh.sections.length],
+    zh: CONTENT.zh.contactTitle,
+    en: CONTENT.en.contactTitle,
+  },
+];
+const tocLabel = lang === 'zh' ? '目录' : 'Contents';
 // 更新日期：与隐私声明页同口径，格式一致
 const lastUpdated = lang === 'zh' ? '最后更新：2026 年 11 月 7 日' : 'Last updated: 2026-11-07';
 const T = lang === 'zh'
@@ -283,10 +310,35 @@ const T = lang === 'zh'
     <h1 class="page-title">{c.title}</h1>
     <p class="lead">{c.lead}</p>
     <p class="updated">{lastUpdated}</p>
+
+    <!-- 目录：与隐私说明页一致的右侧抽屉（悬浮按钮 + 遮罩 + 平滑滚动 + 章节高亮） -->
+    <button class="toc-fab" type="button" aria-controls="copyright-toc" aria-expanded="false" aria-label={tocLabel}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>{tocLabel}</span>
+    </button>
+
+    <div class="toc-overlay" data-toc-close hidden></div>
+
+    <aside class="toc-drawer" id="copyright-toc" aria-hidden="true" aria-label={tocLabel}>
+      <div class="toc-head">
+        <span class="toc-head-title">{tocLabel}</span>
+        <button class="toc-close" type="button" aria-label={lang === 'zh' ? '关闭' : 'Close'}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <nav class="toc-nav">
+        <ol class="toc-list">
+          {TOC.map((t) => (
+            <li><a href={`#${t.id}`}>{lang === 'zh' ? t.zh : t.en}</a></li>
+          ))}
+        </ol>
+      </nav>
+    </aside>
+
     <div class="prose license">
-      {c.sections.map((s) => (
+      {c.sections.map((s, i) => (
         <>
-          <h2>{s.h2}</h2>
+          <h2 id={SECTION_IDS[i]}>{s.h2}</h2>
           {s.blocks.map((b) =>
             b.p
               ? <p set:html={b.p} />
@@ -313,7 +365,7 @@ const T = lang === 'zh'
           )}
         </>
       ))}
-      <h2>{c.contactTitle}</h2>
+      <h2 id={SECTION_IDS[SECTION_IDS.length - 1]}>{c.contactTitle}</h2>
       <p>{c.contactLead}</p>
       <div class="contact-card">
         <a class="contact-mail" href={MAILTO}>{EMAIL}</a>
@@ -368,6 +420,135 @@ const T = lang === 'zh'
   .contact-copy[data-done] { border-color: currentColor; }
   .contact-web { font-size: 0.8125rem; opacity: 0.8; }
   .contact-hint { flex-basis: 100%; margin: 0; font-size: 0.75rem; opacity: 0.6; }
+
+  /* 目录触发按钮：贴右侧中部，默认只露竖排标签，不占正文空间（与隐私说明页一致） */
+  .toc-fab {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 80;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--border);
+    border-right: 0;
+    border-radius: 10px 0 0 10px;
+    background: var(--surface);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+    writing-mode: vertical-rl;
+    letter-spacing: 0.12em;
+    transition: background .15s, color .15s, opacity .18s;
+  }
+  .toc-fab svg { writing-mode: horizontal-tb; }
+  .toc-fab:hover { background: var(--bg-soft); color: var(--accent); }
+  /* 抽屉打开时隐藏触发按钮，避免其透过遮罩露出一块深色 */
+  body.toc-open .toc-fab { opacity: 0; pointer-events: none; }
+  /* 阅读/滑动时淡化按钮，减少对右下内容的遮挡 */
+  .toc-fab.scrolling { opacity: 0.22; }
+
+  /* 抽屉背后的遮罩 */
+  .toc-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.32);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease;
+    z-index: 85;
+  }
+  .toc-overlay.open { opacity: 1; pointer-events: auto; }
+
+  /* 右侧抽屉：默认移出屏幕右侧，打开时滑入 */
+  .toc-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 320px;
+    max-width: 86vw;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+    transform: translateX(100%);
+    transition: transform .26s ease;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+  }
+  .toc-drawer.open { transform: translateX(0); }
+  .toc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc-head-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .toc-close {
+    display: inline-flex;
+    padding: 0.3rem;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    line-height: 0;
+  }
+  .toc-close:hover { background: var(--bg-soft); color: var(--text-strong); }
+  .toc-nav { padding: 0.6rem 0.7rem 1.4rem; overflow-y: auto; }
+  .toc-list { margin: 0; padding: 0; list-style: none; }
+  .toc-list li { margin: 0.05rem 0; }
+  .toc-list a {
+    display: block;
+    padding: 0.45rem 0.7rem;
+    border-radius: 7px;
+    border-left: 2px solid transparent;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    transition: color .15s, background .15s, border-color .15s;
+  }
+  .toc-list a:hover { color: var(--text); background: var(--bg-soft); }
+  .toc-list a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: var(--bg-soft);
+    font-weight: 600;
+  }
+
+  /* 移动端：窄屏改为右下角小圆形图标按钮（与隐私说明页一致） */
+  @media (max-width: 880px) {
+    .toc-drawer { width: 86vw; }
+    .toc-fab {
+      top: auto;
+      bottom: 120px;
+      right: 16px;
+      transform: none;
+      writing-mode: horizontal-tb;
+      width: 46px;
+      height: 46px;
+      padding: 0;
+      justify-content: center;
+      border-right: 1px solid var(--border);
+      border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    }
+    .toc-fab span { display: none; }
+    .toc-fab svg { width: 18px; height: 18px; }
+  }
 </style>
 
 <script is:inline>
@@ -394,4 +575,99 @@ const T = lang === 'zh'
       }
     });
   });
+</script>
+
+<script>
+  // 目录抽屉：默认隐藏，点击按钮/遮罩/关闭/ESC 开合；点条目跳转后自动收起（与隐私说明页一致）
+  const fab = document.querySelector('.toc-fab');
+  const drawer = document.querySelector('.toc-drawer');
+  const overlay = document.querySelector('.toc-overlay');
+  const closeBtn = document.querySelector('.toc-close');
+
+  function openToc() {
+    drawer.classList.add('open');
+    overlay.classList.add('open');
+    overlay.hidden = false;
+    drawer.setAttribute('aria-hidden', 'false');
+    fab.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('toc-open');
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+  }
+  function closeToc() {
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    fab.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('toc-open');
+    document.body.style.overflow = '';
+    setTimeout(() => { overlay.hidden = true; }, 220);
+    fab.focus();
+  }
+
+  // 表格横向溢出时显示边缘渐隐，提示可左右滑动
+  document.querySelectorAll('.table-wrap').forEach((wrap) => {
+    const update = () => {
+      const max = wrap.scrollWidth - wrap.clientWidth;
+      const scrollable = max > 2;
+      wrap.classList.toggle('is-scroll', scrollable && wrap.scrollLeft < max - 2);
+      wrap.classList.toggle('is-scroll-left', scrollable && wrap.scrollLeft > 2);
+    };
+    update();
+    wrap.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+  });
+
+  // 滚动时淡化目录按钮，减少对正文的遮挡
+  let tocScrollTimer;
+  window.addEventListener('scroll', () => {
+    fab?.classList.add('scrolling');
+    clearTimeout(tocScrollTimer);
+    tocScrollTimer = setTimeout(() => fab?.classList.remove('scrolling'), 600);
+  }, { passive: true });
+
+  fab?.addEventListener('click', openToc);
+  closeBtn?.addEventListener('click', closeToc);
+  overlay?.addEventListener('click', closeToc);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && drawer.classList.contains('open')) closeToc();
+  });
+
+  // 目录：点击平滑滚动到锚点（并收起抽屉），高亮当前所在章节
+  const links = Array.from(document.querySelectorAll('.toc-list a'));
+  if (links.length) {
+    const map = new Map(links.map((l) => [l.getAttribute('href')?.slice(1) || '', l]));
+    links.forEach((l) => {
+      l.addEventListener('click', (e) => {
+        const id = l.getAttribute('href')?.slice(1);
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (el) {
+          e.preventDefault();
+          closeToc();
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.replaceState(null, '', '#' + id);
+        }
+      });
+    });
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            links.forEach((l) => l.classList.remove('active'));
+            const link = map.get(entry.target.id);
+            if (link) link.classList.add('active');
+          }
+        });
+      },
+      { rootMargin: '-80px 0px -65% 0px', threshold: 0 }
+    );
+    document.querySelectorAll('h2[id]').forEach((h) => obs.observe(h));
+
+    // 离开页面时断开观察器（bfcache 回退时重新观察）
+    window.addEventListener('pagehide', () => obs.disconnect());
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) document.querySelectorAll('h2[id]').forEach((h) => obs.observe(h));
+    });
+  }
 </script>
