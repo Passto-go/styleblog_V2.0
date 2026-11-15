@@ -36,7 +36,7 @@ export const ui = {
     'widget.countdown': '倒计时',
     'widget.countdownTo': '距 {label}',
     'widget.countdownTz': '北京时间（UTC+8）',
-    'widget.countdownSince': '自 {label} 起已过去',
+    'widget.countdownSince': '自 {label} 已过去',
 
     'profile.posts': '文章',
     'profile.categories': '分类',

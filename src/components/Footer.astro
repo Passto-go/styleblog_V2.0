@@ -11,7 +11,7 @@ const yearLabel = site.startYear ? `${site.startYear}–${year}` : `${year}`;
   <div class="wrap footer-inner">
     <div class="footer-meta">
       <p>{t('footer.copyright', { year: yearLabel })}</p>
-      <p>Powered by
+      <p>Powered by{' '}
         {site.poweredBy.map((p, i) => (
           <span>{i > 0 && ' & '}<a href={p.url} target="_blank" rel="noopener">{p.name}</a></span>
         ))}
