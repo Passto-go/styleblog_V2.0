@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { getAnalytics } from '../../lib/posts.js';
 
 const { lang } = Astro.props;
 const year = new Date().getFullYear();
@@ -272,6 +273,24 @@ const CONTENT = {
 };
 
 const c = CONTENT[lang] || CONTENT.en;
+
+// 第三方统计开关联动（仅 GA4 / Clarity 参与；Cloudflare 为始终启用的边缘服务，保持静态说明）。
+// 在「六、托管与第三方服务」的第三方列表里，按开关状态追加 GA / Clarity 条目；两者都关则不追加。
+const analyticsCfg = await getAnalytics();
+const gaOn = !!(analyticsCfg.ga && analyticsCfg.ga.enabled && analyticsCfg.ga.id);
+const clarityOn = !!(analyticsCfg.clarity && analyticsCfg.clarity.enabled && analyticsCfg.clarity.id);
+if (gaOn || clarityOn) {
+  const tpZh = CONTENT.zh.sections.find((s) => s.h2 === '六、托管与第三方服务');
+  const tpEn = CONTENT.en.sections.find((s) => s.h2 === '6. Hosting and third-party services');
+  if (gaOn) {
+    tpZh.blocks[0].ul.push('<strong>Google Analytics</strong>（可选）：访问统计；<strong>仅在访客点击「同意」后加载</strong>，数据传至 Google（美国）。');
+    tpEn.blocks[0].ul.push('<strong>Google Analytics</strong> (optional): visit analytics; <strong>loaded only after the visitor clicks "Accept"</strong>; data is transferred to Google (United States).');
+  }
+  if (clarityOn) {
+    tpZh.blocks[0].ul.push('<strong>Microsoft Clarity</strong>（可选）：访客行为分析与会话重放；<strong>仅在访客点击「同意」后加载</strong>，数据传至 Microsoft（美国）。');
+    tpEn.blocks[0].ul.push('<strong>Microsoft Clarity</strong> (optional): behaviour analytics and session replay; <strong>loaded only after the visitor clicks "Accept"</strong>; data is transferred to Microsoft (United States).');
+  }
+}
 // 目录（Table of Contents）：与隐私说明页一致，章节锚点中英文共用同一组 id。
 // 前 9 项对应 sections，末项对应「联系」；标题直接取 CONTENT，避免与正文标题不同步。
 const SECTION_IDS = [

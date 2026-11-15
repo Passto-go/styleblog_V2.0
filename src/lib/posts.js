@@ -315,6 +315,42 @@ export async function getSetting(key, opts = {}) {
   }
 }
 
+// 第三方统计分析配置（后台「其他功能 → 第三方统计」写入 site_settings，键 analytics）。
+// 归一化后返回 { ga:{enabled,id}, clarity:{enabled,id} }，保证 ConsentBanner 与
+// 隐私/许可页用同一份真相，避免「开关已关、说明却还描述 GA」这类不一致（合规隐患）。
+//
+// 每个服务各自独立开关 + ID 输入：开启且填了 ID 才真正生效；只填 ID 不开启、或不填均不生效。
+// 默认值沿用线上既有行为，做到无缝迁移：
+//   - GA4 默认启用且 ID 回退为 G-RY0SNN3G81（原写死值），保证迁移瞬间 GA 不断数据；
+//   - Clarity 默认关闭、无 ID。
+// 一旦后台写入过该键，默认值即失效，完全以保存值为准。
+// Cloudflare Web Analytics 由边缘注入、始终启用，本站代码不控制、亦不在此结构中。
+const DEFAULT_GA_ID = 'G-RY0SNN3G81';
+export const DEFAULT_ANALYTICS = {
+  ga: { enabled: true, id: DEFAULT_GA_ID },
+  clarity: { enabled: false, id: '' },
+};
+
+export async function getAnalytics(opts = {}) {
+  const v = await getSetting('analytics', opts);
+  if (!v || typeof v !== 'object') return { ga: { ...DEFAULT_ANALYTICS.ga }, clarity: { ...DEFAULT_ANALYTICS.clarity } };
+  const ga = (v.ga && typeof v.ga === 'object') ? v.ga : {};
+  const clarity = (v.clarity && typeof v.clarity === 'object') ? v.clarity : {};
+  return {
+    ga: { enabled: ga.enabled === true, id: String(ga.id || '').trim() || DEFAULT_GA_ID },
+    clarity: { enabled: clarity.enabled === true, id: String(clarity.id || '').trim() },
+  };
+}
+
+// 返回当前真正生效（各自启用 + 有 ID）的统计服务列表，供横幅注入与说明页渲染。
+export function activeAnalyticsServices(cfg) {
+  const out = [];
+  if (!cfg) return out;
+  if (cfg.ga && cfg.ga.enabled && cfg.ga.id) out.push({ type: 'ga', id: cfg.ga.id });
+  if (cfg.clarity && cfg.clarity.enabled && cfg.clarity.id) out.push({ type: 'clarity', id: cfg.clarity.id });
+  return out;
+}
+
 // 站点头像地址（后台「站点设置 → 头像」上传后存 site_settings.avatar）。
 // 未配置 / 读取失败 / 上传通道未就绪时，回退源码里的 site.avatar（public/avatar.png），
 // 保证头像永远有内容可渲染：读取失败绝不能把线上头像弄丢。

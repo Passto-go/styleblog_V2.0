@@ -147,7 +147,7 @@ export const ui = {
     'footer.privacy': '隐私说明',
     // {link} 是隐私说明链接的占位符，由 ConsentBanner.astro 替换为 <a>，
     // 保证链接落在句子内部（详见 <a>隐私说明</a>。），而不是句外再挂一个重复入口。
-    'consent.text': '本网站使用 Google Analytics 来统计访问量、访客互动与回访情况。若你选择接受，分析类 Cookie 将存储在你的浏览器中；若选择拒绝，不会影响你正常浏览网站。详见{link}。',
+    'consent.text': '本网站使用 {names} 来统计访问量、访客互动与回访情况。若你选择接受，相关 Cookie 将存储在你的浏览器中；若选择拒绝，不会影响你正常浏览网站。详见{link}。',
     'consent.more': '隐私说明',
     'consent.accept': '同意',
     'consent.reject': '拒绝',
@@ -295,7 +295,7 @@ export const ui = {
     'footer.license': 'Terms of Use',
     'footer.privacy': 'Privacy Policy',
     // {link} 占位符，同样落在句内：See our <a>Privacy Policy</a>.
-    'consent.text': 'This website uses Google Analytics to measure traffic, visitor engagement, and repeat visits. If you accept, analytics cookies will be stored in your browser. You can decline them without affecting normal browsing. See our {link}.',
+    'consent.text': 'This website uses {names} to measure traffic, visitor engagement, and repeat visits. If you accept, analytics cookies will be stored in your browser. You can decline them without affecting normal browsing. See our {link}.',
     'consent.more': 'Privacy Policy',
     'consent.accept': 'Accept',
     'consent.reject': 'Decline',

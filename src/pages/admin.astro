@@ -342,18 +342,30 @@ Astro.response.headers.set('Cache-Control', 'no-store');
           </div>
 
           <div class="wb-misc-col">
-            <div class="wb-card" id="about-card">
-              <div class="wb-side-head"><strong>关于页面文案</strong></div>
-              <p class="wb-hint wb-cat-note">编辑「关于」页文字，保存后刷新前台即时生效，不走代码发布。正文支持 <strong>**粗体**</strong>、<strong>[文字](网址)</strong>、<strong>## 小标题</strong>，空行分段；引导语为纯文本单行。全部留空则回退源码内置的默认文案。</p>
-              <label class="wb-field">中文 — 引导语<input id="about-lead-zh" placeholder="如：你好，我是老一贯。" /></label>
-              <label class="wb-field">中文 — 正文<textarea id="about-body-zh" rows="10" placeholder="## 小标题&#10;&#10;正文段落…"></textarea></label>
-              <label class="wb-field">English — Lead<input id="about-lead-en" placeholder="Hi, I'm Lao Yiguan." /></label>
-              <label class="wb-field">English — Body<textarea id="about-body-en" rows="10" placeholder="## Heading&#10;&#10;Paragraph…"></textarea></label>
-              <div class="wb-about-acts">
-                <button id="about-save" class="btn" type="button">保存文案</button>
-                <button id="about-reset" class="wb-cat-act wb-cat-del" type="button">恢复默认</button>
+            <div class="wb-card" id="analytics-card">
+              <div class="wb-side-head"><strong>第三方统计</strong></div>
+              <p class="wb-hint wb-cat-note">接入 Google Analytics 4 与 Microsoft Clarity。两项均<strong>默认关闭、须经访客同意后才加载</strong>，可独立开关；不填 ID 或仅填 ID 未开启均不会生效。Cloudflare Web Analytics 由平台边缘注入、始终启用，不在本站控制范围内。</p>
+
+              <div class="wb-an-row">
+                <label class="wb-an-toggle">
+                  <input id="ga-enabled" type="checkbox" />
+                  <span class="wb-an-track"><span class="wb-an-thumb"></span></span>
+                  <span class="wb-an-label">启用 Google Analytics</span>
+                </label>
+                <label class="wb-field wb-field--inline">ID<input id="ga-id" placeholder="如：G-XXXXXXXXXX" /></label>
               </div>
-              <span id="about-msg" class="wb-hint" role="status" aria-live="polite"></span>
+
+              <div class="wb-an-row">
+                <label class="wb-an-toggle">
+                  <input id="clarity-enabled" type="checkbox" />
+                  <span class="wb-an-track"><span class="wb-an-thumb"></span></span>
+                  <span class="wb-an-label">启用 Microsoft Clarity</span>
+                </label>
+                <label class="wb-field wb-field--inline">ID<input id="clarity-id" placeholder="如：xxxxxxxxxx" /></label>
+              </div>
+
+              <button id="analytics-save" class="btn" type="button">保存统计设置</button>
+              <span id="analytics-msg" class="wb-hint" role="status" aria-live="polite"></span>
             </div>
           </div>
         </div>
@@ -446,7 +458,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     if (name === 'comments') loadComments();
     if (name === 'files') loadMedia();
     if (name === 'categories') loadCatManage();
-    if (name === 'misc') { loadCountdown(); loadExcerptSettings(); loadAbout(); loadAvatar(); }
+    if (name === 'misc') { loadCountdown(); loadExcerptSettings(); loadAnalytics(); loadAvatar(); }
   }
 
   // ---------- 首页倒计时（存于 site_settings） ----------
@@ -509,47 +521,37 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     msg.textContent = '已保存 ✓ 对之后留空摘要的发布生效'; msg.dataset.kind = 'ok';
   }
 
-  // ---------- 关于页文案（存于 site_settings，键 about_content） ----------
+  // ---------- 第三方统计（存于 site_settings，键 analytics） ----------
   // 与倒计时/摘要同款存储机制：后台保存 → 前台 SSR 每请求现读 → 刷新即生效，不走代码发布。
-  // 值形如 { zh: { lead, body }, en: { lead, body } }；某语言/某字段为空时，
-  // 前台回退 src/i18n/ui.js 的内置文案（见 AboutPage.astro），所以清空不会把页面弄空。
-  async function loadAbout() {
+  // 值形如 { ga: { enabled, id }, clarity: { enabled, id } }，两个服务各自独立开关 + ID。
+  // 启用与否以「开关开启 且 填了 ID」为准；仅填 ID 不开启、或不填均不生效（前台 activeAnalyticsServices 已据此过滤）。
+  async function loadAnalytics() {
     let v = null;
     try {
       const { data, error } = await supabase
-        .from('site_settings').select('value').eq('key', 'about_content').maybeSingle();
+        .from('site_settings').select('value').eq('key', 'analytics').maybeSingle();
       if (!error && data?.value) v = data.value;
     } catch {}
-    $('about-lead-zh').value = (v?.zh?.lead) || '';
-    $('about-body-zh').value = (v?.zh?.body) || '';
-    $('about-lead-en').value = (v?.en?.lead) || '';
-    $('about-body-en').value = (v?.en?.body) || '';
+    const ga = (v && v.ga && typeof v.ga === 'object') ? v.ga : {};
+    const clarity = (v && v.clarity && typeof v.clarity === 'object') ? v.clarity : {};
+    $('ga-enabled').checked = ga.enabled === true;
+    $('ga-id').value = String(ga.id || '').trim();
+    $('clarity-enabled').checked = clarity.enabled === true;
+    $('clarity-id').value = String(clarity.id || '').trim();
   }
 
-  async function saveAbout() {
-    const msg = $('about-msg');
+  async function saveAnalytics() {
+    const msg = $('analytics-msg');
     msg.textContent = '保存中…'; msg.dataset.kind = '';
+    const value = {
+      ga: { enabled: $('ga-enabled').checked, id: $('ga-id').value.trim() },
+      clarity: { enabled: $('clarity-enabled').checked, id: $('clarity-id').value.trim() },
+    };
     const { error } = await supabase
       .from('site_settings')
-      .upsert({
-        key: 'about_content',
-        value: {
-          zh: { lead: $('about-lead-zh').value.trim(), body: $('about-body-zh').value },
-          en: { lead: $('about-lead-en').value.trim(), body: $('about-body-en').value },
-        },
-        updated_at: new Date().toISOString(),
-      });
+      .upsert({ key: 'analytics', value, updated_at: new Date().toISOString() });
     if (error) { msg.textContent = '保存失败：' + error.message; msg.dataset.kind = 'err'; }
-    else { msg.textContent = '已保存 ✓ 刷新「关于」页即可生效'; msg.dataset.kind = 'ok'; }
-  }
-
-  async function resetAbout() {
-    if (!confirm('恢复默认将删除已保存文案，「关于」页回到源码内置版本。确定继续？')) return;
-    const msg = $('about-msg');
-    const { error } = await supabase.from('site_settings').delete().eq('key', 'about_content');
-    if (error) { msg.textContent = '恢复失败：' + error.message; msg.dataset.kind = 'err'; return; }
-    await loadAbout();
-    msg.textContent = '已恢复默认文案 ✓'; msg.dataset.kind = 'ok';
+    else { msg.textContent = '已保存 ✓ 刷新前台「隐私说明 / 版权与许可」即同步开关状态'; msg.dataset.kind = 'ok'; }
   }
 
   // ---------- 站点设置 → 头像 ----------
@@ -3310,8 +3312,7 @@ Astro.response.headers.set('Cache-Control', 'no-store');
     $('editor-close').onclick = closeEditor;
     $('cd-save').onclick = saveCountdown;
     $('ex-save').onclick = saveExcerptSettings;
-    $('about-save').onclick = saveAbout;
-    $('about-reset').onclick = resetAbout;
+    $('analytics-save').onclick = saveAnalytics;
     $('ai-excerpt-btn').onclick = () => aiGenerateExcerpt();
 
     // 站点设置 → 头像：选择文件（隐藏 input 承接）/ 上传 / 删除

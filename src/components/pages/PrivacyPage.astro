@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { getAnalytics } from '../../lib/posts.js';
 
 const { lang } = Astro.props;
 const EMAIL = 'intl1024@outlook.com';
@@ -27,6 +28,11 @@ const leadEn = 'This site (The Way, One Thread) is a personal blog. This notice 
 const oneLinerZh = '本站不进行跨站追踪、用户画像、广告投放或数据交易。访客信息仅在你主动发表评论时产生；页面溯源水印会在渲染时读取 IP 地址与设备时区，但该信息不写入数据库、不对外传输。此外，加密文章的解锁与部分接口的访问频率限制会将 IP 地址临时写入数据库（详见第五节），保存期限见第七节。';
 const oneLinerEn = 'This site does not engage in cross-site tracking, user profiling, advertising, or data trading. Visitor information is generated only when you voluntarily post a comment. The page watermark reads your IP address and device time zone at render time, but does not store or transmit this information. Separately, unlock attempts on protected posts and rate limiting on certain endpoints write your IP address temporarily to the database (see Section 5); retention periods are set out in Section 7.';
 const tocLabel = lang === 'zh' ? '目录' : 'Contents';
+
+// 第三方统计开关（仅 GA4 / Clarity 参与联动；Cloudflare 为始终启用的边缘服务，不在此列，保持静态说明）。
+const analyticsCfg = await getAnalytics();
+const gaOn = !!(analyticsCfg.ga && analyticsCfg.ga.enabled && analyticsCfg.ga.id);
+const clarityOn = !!(analyticsCfg.clarity && analyticsCfg.clarity.enabled && analyticsCfg.clarity.id);
 ---
 
 <Base lang={lang} title={title} description={lang === 'zh' ? leadZh : leadEn}>
@@ -122,7 +128,11 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             <p>访客如不希望显示该水印，可通过浏览器扩展屏蔽对应页面元素，或以无痕模式访问。本站不依赖水印实现任何功能，屏蔽后不影响内容阅读。</p>
 
             <h2 id="cookies">四、Cookie 与浏览器本地存储</h2>
-            <p>本站不使用任何广告 Cookie，亦不进行跨站追踪。Cookie 按功能分为两类：保障网站功能所必需者（无需同意），以及在访客同意后方才设置者（Google Analytics）。</p>
+            {gaOn || clarityOn ? (
+              <p>本站不使用任何广告 Cookie，亦不进行跨站追踪。Cookie 按功能分为两类：保障网站功能所必需者（无需同意），以及在访客同意后方才设置者（{[gaOn && 'Google Analytics', clarityOn && 'Microsoft Clarity'].filter(Boolean).join('、')}）。</p>
+            ) : (
+              <p>本站不使用任何广告 Cookie，亦不进行跨站追踪，且不设置任何分析类 Cookie；仅保留保障网站功能所必需的 Cookie 与浏览器本地存储。</p>
+            )}
             <div class="table-wrap"><table class="table-wide">
               <thead>
                 <tr><th>名称</th><th>类型</th><th>作用</th><th>期限</th><th>是否需要同意</th></tr>
@@ -132,12 +142,18 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><td><code>theme</code></td><td>浏览器本地存储</td><td>保存访客选择的深色或浅色主题</td><td>直到你清除浏览器数据</td><td>否（仅存本地）</td></tr>
                 <tr><td><code>styleblog-my-comments</code></td><td>浏览器本地存储</td><td>保存访客的评论删除令牌，用于自行删除已发表的评论</td><td>同上</td><td>否（仅存本地）</td></tr>
                 <tr><td><code>analytics-consent</code></td><td>浏览器本地存储</td><td>保存访客对统计的选择（<code>granted</code> / <code>denied</code>），以避免重复询问</td><td>直到你清除浏览器数据</td><td>否（仅存本地）</td></tr>
-                <tr><td><code>_ga</code></td><td>Cookie</td><td>Google Analytics 用以区分访客的随机标识符</td><td>最长 2 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
-                <tr><td><code>_ga_&lt;容器ID&gt;</code></td><td>Cookie</td><td>Google Analytics 4 用以维持会话状态</td><td>最长 2 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
+                {gaOn && (<>
+                  <tr><td><code>_ga</code></td><td>Cookie</td><td>Google Analytics 用以区分访客的随机标识符</td><td>最长 2 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
+                  <tr><td><code>_ga_&lt;容器ID&gt;</code></td><td>Cookie</td><td>Google Analytics 4 用以维持会话状态</td><td>最长 2 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
+                </>)}
+                {clarityOn && (<>
+                  <tr><td><code>_clck</code></td><td>Cookie</td><td>Microsoft Clarity 用以识别访客与持久化会话的标识符</td><td>最长 1 年</td><td><strong>是</strong>；未经同意不予写入</td></tr>
+                  <tr><td><code>_clsk</code></td><td>Cookie</td><td>Microsoft Clarity 用以记录单页会话与页面序列</td><td>最长 1 天</td><td><strong>是</strong>；未经同意不予写入</td></tr>
+                </>)}
               </tbody>
             </table></div>
             <ul>
-              <li>除 <code>unlocked</code> 与 <code>_ga*</code> 会随请求发送外，其余均仅存于访客浏览器本地，不上传服务器。</li>
+              <li>除 <code>unlocked</code>{gaOn || clarityOn ? (<>&nbsp;及分析类 Cookie（<code>_ga*</code>{clarityOn && <>、<code>_clck</code>、<code>_clsk</code></>}）</>) : null} 会随请求发送外，其余均仅存于访客浏览器本地，不上传服务器。</li>
               <li>清除浏览器数据即可全部移除，不影响内容阅读。</li>
               <li><code>unlocked</code> 设置 <code>HttpOnly</code> 与 <code>SameSite=Lax</code> 属性，页面脚本无法读取，仅用于判断解锁状态，有效期为 30 天。</li>
               <li>关于评论删除凭证：除浏览器本地保存的副本外，其对应记录亦保存在本站数据库的评论记录中（字段名 <code>delete_token</code>），用于在服务端校验删除请求的权限。该令牌仅为随机字符串，不含访客身份信息；删除评论后随之移除。</li>
@@ -154,7 +170,8 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><td>Supabase</td><td>数据库、登录鉴权与对象存储</td><td>文章、评论（含昵称、邮箱、删除令牌）、站长账号、访问频率限制记录（含 IP 地址）</td></tr>
                 <tr><td>GitHub</td><td>代码托管</td><td>不涉及访客数据</td></tr>
                 <tr><td>智谱 GLM（bigmodel.cn）</td><td>站长在后台撰写与翻译文章时使用的语言模型服务</td><td>仅处理站长提交的文章文本，不涉及访客数据</td></tr>
-                <tr><td><strong>Google Analytics</strong>（可选）</td><td>访问统计</td><td><strong>仅在访客点击「同意」后加载</strong>，数据传至 Google（美国）</td></tr>
+                {gaOn && (<tr><td><strong>Google Analytics</strong>（可选）</td><td>访问统计</td><td><strong>仅在访客点击「同意」后加载</strong>，数据传至 Google（美国）</td></tr>)}
+                {clarityOn && (<tr><td><strong>Microsoft Clarity</strong>（可选）</td><td>访客行为分析与会话重放</td><td><strong>仅在访客点击「同意」后加载</strong>，数据传至 Microsoft（美国）</td></tr>)}
               </tbody>
             </table></div>
             <p>本站不接入百度统计、友盟、51LA 等国内统计平台，亦无广告联盟、联盟营销或行为追踪脚本。</p>
@@ -168,25 +185,42 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
 
             <h2 id="analytics">六、关于统计与访客的选择</h2>
             <p>本站接入访问统计的目的限于了解网站流量，以及与内容相关的互动与留存情况，即判断文章的实际阅读情况、访客来源、跨篇阅读行为与回访比例。上述信息仅用于决定内容方向与改进方式，不作其他用途。</p>
-            <p>本站同时使用两套统计工具，其性质不同，应分别理解：</p>
-            <h3>1. Cloudflare Web Analytics（始终启用，无需同意）</h3>
+            {gaOn || clarityOn ? (
+              <p>本站接入下列可选的统计分析工具（视后台启用情况而定），其性质不同，应分别理解：</p>
+            ) : (
+              <p>本站当前未启用任何可选的第三方统计分析工具（Google Analytics / Microsoft Clarity）；仅 Cloudflare Web Analytics 按其自身政策持续运行（见下）。</p>
+            )}
+            <h3>Cloudflare Web Analytics（始终启用，无需同意）</h3>
             <ul>
               <li>不使用 Cookie、不使用本地存储、不进行设备指纹识别。</li>
               <li>记录的为页面级聚合指标，包括浏览量、来源、国家或地区、页面性能。</li>
-              <li>据 Cloudflare 说明，其 Web Analytics 不收集或使用访客个人数据，亦不使用 Cookie 或设备指纹进行统计。该服务与可选启用的 Google Analytics 相互独立，本站未对其提供单独开关。</li>
+              <li>据 Cloudflare 说明，其 Web Analytics 不收集或使用访客个人数据，亦不使用 Cookie 或设备指纹进行统计。该服务与本站可选的 Google Analytics / Microsoft Clarity 相互独立，本站未对其提供单独开关。</li>
             </ul>
-            <h3>2. Google Analytics（默认不加载，须经同意）</h3>
-            <ul>
-              <li>首次访问时页面底部显示告知横幅，询问是否允许加载 Google Analytics。</li>
-              <li>「同意」与「拒绝」两个选项均不预设选中，样式同等突出。</li>
-              <li>在访客点击「同意」之前，Google Analytics 的脚本不会被下载或请求，而非加载后再行拦截上报。</li>
-              <li>点击「拒绝」后，Google Analytics 始终不加载，站点功能不受影响。</li>
-              <li>无论作何选择，该选择均记录于浏览器本地，之后不再重复询问；清除浏览器数据后将重新询问。</li>
-              <li>同意后衡量的指标包括页面浏览量、会话数、平均互动时长、跳出情况、新老访客比例与回访情况。本站已启用 IP 匿名化（<code>anonymize_ip</code>）配置；Google Analytics 在收集数据时使用 IP 地址以提供基础服务与粗略地理位置判断，但不记录或存储完整 IP 地址。相关数据不用于广告投放或跨站定向。</li>
-            </ul>
-            <h3>3. 中国大陆网络环境下的实际情况</h3>
-            <p>Google Analytics 的脚本位于 <code>googletagmanager.com</code>，在中国大陆部分网络环境下可能无法加载或加载缓慢。此时即使访客已选择「同意」，亦不会产生数据上报，此属网络条件限制，非本站行为。这也是本站保留 Cloudflare Web Analytics 的原因：该服务是中国大陆访客可被稳定统计的渠道。</p>
-            <h3>4. 更改统计选择</h3>
+            {gaOn && (<>
+              <h3>Google Analytics（默认不加载，须经同意）</h3>
+              <ul>
+                <li>首次访问时页面底部显示告知横幅，询问是否允许加载 Google Analytics。</li>
+                <li>「同意」与「拒绝」两个选项均不预设选中，样式同等突出。</li>
+                <li>在访客点击「同意」之前，Google Analytics 的脚本不会被下载或请求，而非加载后再行拦截上报。</li>
+                <li>点击「拒绝」后，Google Analytics 始终不加载，站点功能不受影响。</li>
+                <li>无论作何选择，该选择均记录于浏览器本地，之后不再重复询问；清除浏览器数据后将重新询问。</li>
+                <li>同意后衡量的指标包括页面浏览量、会话数、平均互动时长、跳出情况、新老访客比例与回访情况。本站已启用 IP 匿名化（<code>anonymize_ip</code>）配置；Google Analytics 在收集数据时使用 IP 地址以提供基础服务与粗略地理位置判断，但不记录或存储完整 IP 地址。相关数据不用于广告投放或跨站定向。</li>
+              </ul>
+            </>)}
+            {clarityOn && (<>
+              <h3>Microsoft Clarity（默认不加载，须经同意）</h3>
+              <ul>
+                <li>Microsoft Clarity 是微软提供的访客行为分析工具，可记录页面热区、滚动深度与会话重放（session replay）。</li>
+                <li>首次访问时页面底部显示告知横幅，询问是否允许加载；「同意」与「拒绝」两个选项样式同等突出。</li>
+                <li>在访客点击「同意」之前，Clarity 的脚本不会被下载或请求。</li>
+                <li>点击「拒绝」后，Clarity 始终不加载，站点功能不受影响。</li>
+                <li>Clarity 使用 Cookie（如 <code>_clck</code>、<code>_clsk</code>）与会话存储记录访客交互，相关数据传至 Microsoft（美国），用于改进内容呈现；本站启用其默认隐私设置，不收集密码、支付等敏感字段。</li>
+              </ul>
+            </>)}
+            {gaOn && (
+              <p>Google Analytics 的脚本位于 <code>googletagmanager.com</code>，在中国大陆部分网络环境下可能无法加载或加载缓慢。此时即使访客已选择「同意」，亦不会产生数据上报，此属网络条件限制，非本站行为。这也是本站保留 Cloudflare Web Analytics 的原因：该服务是中国大陆访客可被稳定统计的渠道。</p>
+            )}
+            <h3>更改统计选择</h3>
             <p>清除浏览器本地存储或使用无痕窗口访问，即可重新触发询问。若此前选择「同意」而希望撤回，可清除 <code>analytics-consent</code> 存储项后刷新页面，重新选择「拒绝」。</p>
 
             <h2 id="retention">七、数据保存期限</h2>
@@ -285,7 +319,11 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
             <p>Visitors who prefer not to see the watermark may hide the element with a browser extension or browse in private mode. No functionality depends on the watermark, and hiding it does not affect access to content.</p>
 
             <h2 id="cookies">4. Cookies and local storage</h2>
-            <p>This site uses no advertising cookies and does not carry out cross-site tracking. Cookies fall into two categories: those necessary for site functionality, which require no consent, and those set only after the visitor has consented (Google Analytics).</p>
+            {gaOn || clarityOn ? (
+              <p>This site uses no advertising cookies and does not carry out cross-site tracking. Cookies fall into two categories: those necessary for site functionality, which require no consent, and those set only after the visitor has consented ({[gaOn && 'Google Analytics', clarityOn && 'Microsoft Clarity'].filter(Boolean).join(', ')}).</p>
+            ) : (
+              <p>This site uses no advertising cookies and does not carry out cross-site tracking, and sets no analytics cookies; only the cookies and local storage necessary for site functionality are retained.</p>
+            )}
             <div class="table-wrap"><table class="table-wide">
               <thead>
                 <tr><th>Name</th><th>Type</th><th>Purpose</th><th>Duration</th><th>Consent required</th></tr>
@@ -295,12 +333,18 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><td><code>theme</code></td><td>Browser local storage</td><td>Stores the visitor's light or dark theme preference</td><td>Until you clear browser data</td><td>No (local only)</td></tr>
                 <tr><td><code>styleblog-my-comments</code></td><td>Browser local storage</td><td>Stores the comment deletion token so the visitor can delete their own comments</td><td>Same as above</td><td>No (local only)</td></tr>
                 <tr><td><code>analytics-consent</code></td><td>Browser local storage</td><td>Stores the visitor's analytics choice (<code>granted</code> / <code>denied</code>) to avoid repeated requests</td><td>Until you clear browser data</td><td>No (local only)</td></tr>
-                <tr><td><code>_ga</code></td><td>Cookie</td><td>Random identifier Google Analytics uses to distinguish visitors</td><td>Up to 2 years</td><td><strong>Yes</strong>; not written without consent</td></tr>
-                <tr><td><code>_ga_&lt;container-id&gt;</code></td><td>Cookie</td><td>Google Analytics 4 session state</td><td>Up to 2 years</td><td><strong>Yes</strong>; not written without consent</td></tr>
+                {gaOn && (<>
+                  <tr><td><code>_ga</code></td><td>Cookie</td><td>Random identifier Google Analytics uses to distinguish visitors</td><td>Up to 2 years</td><td><strong>Yes</strong>; not written without consent</td></tr>
+                  <tr><td><code>_ga_&lt;container-id&gt;</code></td><td>Cookie</td><td>Google Analytics 4 session state</td><td>Up to 2 years</td><td><strong>Yes</strong>; not written without consent</td></tr>
+                </>)}
+                {clarityOn && (<>
+                  <tr><td><code>_clck</code></td><td>Cookie</td><td>Identifier Microsoft Clarity uses to recognise visitors and persist sessions</td><td>Up to 1 year</td><td><strong>Yes</strong>; not written without consent</td></tr>
+                  <tr><td><code>_clsk</code></td><td>Cookie</td><td>Microsoft Clarity session and page-sequence record</td><td>Up to 1 day</td><td><strong>Yes</strong>; not written without consent</td></tr>
+                </>)}
               </tbody>
             </table></div>
             <ul>
-              <li>Apart from <code>unlocked</code> and <code>_ga*</code>, which are sent with requests, all entries above reside only in the visitor's browser and are not uploaded to any server.</li>
+              <li>Apart from <code>unlocked</code>{gaOn || clarityOn ? (<>&nbsp;and analytics cookies (<code>_ga*</code>{clarityOn && <>; <code>_clck</code>, <code>_clsk</code></>}), which are sent with requests</>) : null}, all entries above reside only in the visitor's browser and are not uploaded to any server.</li>
               <li>Clearing browser data removes them all, with no effect on access to content.</li>
               <li><code>unlocked</code> is set with the <code>HttpOnly</code> and <code>SameSite=Lax</code> attributes; it cannot be read by page scripts and is used solely to determine unlock status. Its lifetime is 30 days.</li>
               <li>Regarding comment deletion tokens: in addition to the copy held in browser storage, the token is also retained in the site database as part of the comment record (field <code>delete_token</code>), so that the server can verify authority for deletion requests. The token is a random string containing no visitor identity information and is removed together with the comment.</li>
@@ -317,7 +361,8 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
                 <tr><td>Supabase</td><td>Database, authentication, and object storage</td><td>Posts, comments (including display name, email, and deletion token), site owner account, and rate-limiting records (including IP addresses)</td></tr>
                 <tr><td>GitHub</td><td>Code hosting</td><td>No visitor data</td></tr>
                 <tr><td>Zhipu GLM (bigmodel.cn)</td><td>Language model service used by the site owner when drafting and translating posts</td><td>Processes only text submitted by the site owner; no visitor data</td></tr>
-                <tr><td><strong>Google Analytics</strong> (optional)</td><td>Visit analytics</td><td><strong>Loaded only after the visitor clicks "Accept"</strong>; data is transferred to Google (United States)</td></tr>
+                {gaOn && (<tr><td><strong>Google Analytics</strong> (optional)</td><td>Visit analytics</td><td><strong>Loaded only after the visitor clicks "Accept"</strong>; data is transferred to Google (United States)</td></tr>)}
+                {clarityOn && (<tr><td><strong>Microsoft Clarity</strong> (optional)</td><td>Behaviour analytics &amp; session replay</td><td><strong>Loaded only after the visitor clicks "Accept"</strong>; data is transferred to Microsoft (United States)</td></tr>)}
               </tbody>
             </table></div>
             <p>This site does not use Baidu Analytics, Umeng, 51LA or other Chinese analytics platforms, and carries no advertising networks, affiliate marketing, or behavioural tracking scripts.</p>
@@ -331,25 +376,42 @@ const tocLabel = lang === 'zh' ? '目录' : 'Contents';
 
             <h2 id="analytics">6. Analytics and visitors' choices</h2>
             <p>Analytics on this site is used solely to understand traffic and the engagement and retention of content: which posts are actually read, where visitors come from, whether they move on to other posts, and whether they return. Such information is used only to determine content direction and improvements, and for no other purpose.</p>
-            <p>Two analytics services are in use. They differ in nature and should be understood separately.</p>
-            <h3>1. Cloudflare Web Analytics (always enabled, no consent required)</h3>
+            {gaOn || clarityOn ? (
+              <p>The following optional analytics services are in use (depending on what is enabled in the backend); they differ in nature and should be understood separately.</p>
+            ) : (
+              <p>No optional third-party analytics services (Google Analytics / Microsoft Clarity) are currently enabled on this site; only Cloudflare Web Analytics runs continuously under its own policies (below).</p>
+            )}
+            <h3>Cloudflare Web Analytics (always enabled, no consent required)</h3>
             <ul>
               <li>No cookies, no local storage, no device fingerprinting.</li>
               <li>Records aggregated page-level metrics only: page views, referrers, country or region, and page performance.</li>
-              <li>According to Cloudflare, Web Analytics does not collect or use visitors' personal data and does not use cookies or device fingerprinting for analytics. It operates independently of the optional Google Analytics service, and this site provides no separate switch for it.</li>
+              <li>According to Cloudflare, Web Analytics does not collect or use visitors' personal data and does not use cookies or device fingerprinting for analytics. It operates independently of this site's optional Google Analytics / Microsoft Clarity, and this site provides no separate switch for it.</li>
             </ul>
-            <h3>2. Google Analytics (not loaded by default; consent required)</h3>
-            <ul>
-              <li>On the first visit, a notice appears at the bottom of the page asking whether Google Analytics may be loaded.</li>
-              <li>Neither option is preselected, and both buttons are equally prominent.</li>
-              <li>Before the visitor clicks "Accept", the Google Analytics script is neither downloaded nor requested; it is not a case of loading first and blocking reporting afterwards.</li>
-              <li>If the visitor declines, Google Analytics is never loaded and no site functionality is affected.</li>
-              <li>Whichever option is chosen, the choice is stored in browser local storage and the question is not asked again; clearing browser data causes the question to be asked again.</li>
-              <li>After consent, the metrics measured include page views, sessions, average engagement time, bounce behaviour, and the ratio of new to returning visitors. IP anonymisation (<code>anonymize_ip</code>) is enabled on this site. Google Analytics uses IP addresses at collection time to provide the basic service and to determine approximate location, but does not record or store full IP addresses. The data is not used for advertising or cross-site targeting.</li>
-            </ul>
-            <h3>3. Conditions on networks in mainland China</h3>
-            <p>The Google Analytics script is served from <code>googletagmanager.com</code>, which may fail to load or load slowly on some networks in mainland China. In such cases no data is reported even where the visitor has consented; this results from network conditions rather than the conduct of this site. It is also why Cloudflare Web Analytics is retained: it is the channel through which visitors in mainland China can be reliably counted.</p>
-            <h3>4. Changing the analytics choice</h3>
+            {gaOn && (<>
+              <h3>Google Analytics (not loaded by default; consent required)</h3>
+              <ul>
+                <li>On the first visit, a notice appears at the bottom of the page asking whether Google Analytics may be loaded.</li>
+                <li>Neither option is preselected, and both buttons are equally prominent.</li>
+                <li>Before the visitor clicks "Accept", the Google Analytics script is neither downloaded nor requested; it is not a case of loading first and blocking reporting afterwards.</li>
+                <li>If the visitor declines, Google Analytics is never loaded and no site functionality is affected.</li>
+                <li>Whichever option is chosen, the choice is stored in browser local storage and the question is not asked again; clearing browser data causes the question to be asked again.</li>
+                <li>After consent, the metrics measured include page views, sessions, average engagement time, bounce behaviour, and the ratio of new to returning visitors. IP anonymisation (<code>anonymize_ip</code>) is enabled on this site. Google Analytics uses IP addresses at collection time to provide the basic service and to determine approximate location, but does not record or store full IP addresses. The data is not used for advertising or cross-site targeting.</li>
+              </ul>
+            </>)}
+            {clarityOn && (<>
+              <h3>Microsoft Clarity (not loaded by default; consent required)</h3>
+              <ul>
+                <li>Microsoft Clarity is a behavioural analytics tool from Microsoft that records heatmaps, scroll depth, and session replay.</li>
+                <li>On the first visit, a notice appears at the bottom of the page asking whether Clarity may be loaded; both "Accept" and "Decline" are equally prominent.</li>
+                <li>Before the visitor clicks "Accept", the Clarity script is neither downloaded nor requested.</li>
+                <li>If the visitor declines, Clarity is never loaded and no site functionality is affected.</li>
+                <li>Clarity uses cookies (such as <code>_clck</code> and <code>_clsk</code>) and session storage to record visitor interactions; the data is transferred to Microsoft (United States) and used to improve how content is presented. This site uses Clarity's default privacy settings and does not collect sensitive fields such as passwords or payment details.</li>
+              </ul>
+            </>)}
+            {gaOn && (
+              <p>The Google Analytics script is served from <code>googletagmanager.com</code>, which may fail to load or load slowly on some networks in mainland China. In such cases no data is reported even where the visitor has consented; this results from network conditions rather than the conduct of this site. It is also why Cloudflare Web Analytics is retained: it is the channel through which visitors in mainland China can be reliably counted.</p>
+            )}
+            <h3>Changing the analytics choice</h3>
             <p>Clearing browser local storage, or using a private window, causes the question to be asked again. To withdraw a previous consent, remove the <code>analytics-consent</code> entry and reload the page, then select "Decline".</p>
 
             <h2 id="retention">7. How long data is kept</h2>

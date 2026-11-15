@@ -790,6 +790,20 @@ a { color: inherit; }
 /* teaser 复选框：与主开关同款但略降字重，避免抢焦点 */
 .wb-enc-toggle-row { border-top: 1px dashed var(--border); padding-top: 10px; }
 .wb-enc-toggle-row .wb-enc-toggle { font-weight: 500; }
+
+/* 后台：第三方统计 —— 每个服务一行：开关键 + ID 输入 */
+.wb-an-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.wb-an-row + .wb-an-row { border-top: 1px dashed var(--border); padding-top: 12px; }
+.wb-an-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-strong); cursor: pointer; user-select: none; }
+.wb-an-track { position: relative; width: 38px; height: 22px; border-radius: 999px; background: var(--border); transition: background-color .18s ease; flex: none; }
+.wb-an-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .18s ease; }
+.wb-an-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.wb-an-toggle input:checked + .wb-an-track { background: var(--accent); }
+.wb-an-toggle input:checked + .wb-an-track .wb-an-thumb { transform: translateX(16px); }
+.wb-an-toggle input:focus-visible + .wb-an-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.wb-an-label { font-size: 13px; }
+.wb-field--inline { flex: 1 1 180px; margin-top: 0; }
+.wb-field--inline input { width: 100%; }
 .wb-item-title.is-trash { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .wb-trash-left { font-size: 11px; color: #b45309; font-weight: 600; }
 [data-theme="dark"] .wb-trash-left { color: #e08a4a; }
