@@ -32,7 +32,7 @@ if (versions && versions.encrypted) {
 let realContent = versions ? versions.post.content : '';
 if (unlocked && versions && versions.encrypted) {
   const secret = import.meta.env.UNLOCK_SECRET || (cfEnv as any)?.UNLOCK_SECRET || '';
-  realContent = await getEncryptedContent(versions.base, Astro.cookies.get('unlocked')?.value, secret);
+  realContent = await getEncryptedContent(versions.base, versions.displayLang, Astro.cookies.get('unlocked')?.value, secret);
 }
 
 const safePost = versions

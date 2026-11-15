@@ -126,7 +126,12 @@ revoke select (pass_hash) on table public.posts from anon, authenticated;
 -- 否则返回空串。p_secret 仅由服务端传入（Cloudflare Secret / 构建变量），绝不进入客户端包；
 -- 攻击者缺密钥无法伪造 signature，故无法借此读取他人加密正文。函数以 definer 权限读取
 -- base 表 content（绕过对 anon 的 select 收回），且仅对 anon/authenticated 授权、可被服务端调用。
-create or replace function get_post_content(p_base text, p_token text, p_secret text)
+--
+-- 语言感知（修复解密后串语言 bug）：同一 base 下可能同时有中文行与英文行，原实现
+-- `limit 1` 不区分语言，会抽到错误语言的正文。新增可选参数 p_lang：传入时只认该语言行
+-- （lang 字段匹配或 slug 为 base-语言），并按「命中语言优先」排序取第一行；不传（NULL）
+-- 时退化为原行为，保证老调用向后兼容。HMAC 签名仍按 base 计算（密码组级共用），不受 p_lang 影响。
+create or replace function get_post_content(p_base text, p_token text, p_secret text, p_lang text default null)
 returns text
 language plpgsql
 security definer
@@ -142,6 +147,8 @@ begin
   from posts
   where regexp_replace(slug, '-(en|ja)$', '') = p_base
     and published = true and deleted_at is null
+    and (p_lang is null or lang = p_lang or slug = p_base || '-' || p_lang)
+  order by (case when (lang = p_lang or slug = p_base || '-' || p_lang) then 0 else 1 end)
   limit 1;
   if not v_enc then return v_content; end if;
   if p_token is null or p_token = '' then return ''; end if;
@@ -151,7 +158,7 @@ begin
   if v_sig = v_expected then return v_content; else return ''; end if;
 end;
 $$;
-grant execute on function get_post_content(text, text, text) to anon, authenticated;
+grant execute on function get_post_content(text, text, text, text) to anon, authenticated;
 
 -- 6) 索引：按基准 slug 查加密文章时加速（可选，数据量小影响有限）
 create index if not exists posts_base_slug_enc_idx

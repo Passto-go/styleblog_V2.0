@@ -30,7 +30,10 @@ const POST_COLS =
 // H-01 修复：解锁后由服务端取回加密正文。仅在文章已解锁（服务端已校验 cookie）后调用，
 // 经 get_post_content 安全 definer 函数读取；p_secret 为服务端持有的 UNLOCK_SECRET，
 // 绝不进入客户端包。任何未通过 HMAC 令牌校验的请求都拿不到正文。
-export async function getEncryptedContent(base, token, secret) {
+// lang：当前展示语言（已由 getPostWithVersions 按「目标→英文→中文」级联解析，
+// 缺译文时回退为 'zh'）。传给 get_post_content 的 p_lang，使其按语言优先取行，
+// 避免同一 base 下中英双行时 limit 1 抽到错误语言的正文（解密后串语言 bug）。
+export async function getEncryptedContent(base, lang, token, secret) {
   if (!URL || !KEY || !secret) return '';
   try {
     const supabase = sbClient();
@@ -38,6 +41,7 @@ export async function getEncryptedContent(base, token, secret) {
       p_base: base,
       p_token: token || '',
       p_secret: secret,
+      p_lang: lang || null,
     });
     if (error) {
       console.error('[posts] get_post_content 错误:', error.message);
