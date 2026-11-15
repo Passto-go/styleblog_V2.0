@@ -352,7 +352,10 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                   <span class="wb-an-track"><span class="wb-an-thumb"></span></span>
                   <span class="wb-an-label">启用 Google Analytics</span>
                 </label>
-                <label class="wb-field wb-field--inline">ID<input id="ga-id" placeholder="如：G-XXXXXXXXXX" /></label>
+                <label class="wb-an-id">
+                  <span class="wb-an-id-label">ID</span>
+                  <input id="ga-id" placeholder="如：G-XXXXXXXXXX" />
+                </label>
               </div>
 
               <div class="wb-an-row">
@@ -361,11 +364,16 @@ Astro.response.headers.set('Cache-Control', 'no-store');
                   <span class="wb-an-track"><span class="wb-an-thumb"></span></span>
                   <span class="wb-an-label">启用 Microsoft Clarity</span>
                 </label>
-                <label class="wb-field wb-field--inline">ID<input id="clarity-id" placeholder="如：xxxxxxxxxx" /></label>
+                <label class="wb-an-id">
+                  <span class="wb-an-id-label">ID</span>
+                  <input id="clarity-id" placeholder="如：xxxxxxxxxx" />
+                </label>
               </div>
 
-              <button id="analytics-save" class="btn" type="button">保存统计设置</button>
-              <span id="analytics-msg" class="wb-hint" role="status" aria-live="polite"></span>
+              <div class="wb-an-actions">
+                <button id="analytics-save" class="btn" type="button">保存统计设置</button>
+                <span id="analytics-msg" class="wb-hint" role="status" aria-live="polite"></span>
+              </div>
             </div>
           </div>
         </div>
