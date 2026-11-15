@@ -24,8 +24,7 @@ function normalizeTz(iso) {
 }
 const tzTarget = normalizeTz(target);
 
-const labels = lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : ['天', '时', '分', '秒'];
-const units = ['d', 'h', 'm', 's'];
+// units / labels 在 isPast 判定后按模式定义（见下方），此处仅占位
 
 function fmtDate(iso, l) {
   const d = new Date(normalizeTz(iso));
@@ -48,6 +47,11 @@ const isPast = isValidTarget && new Date(tzTarget).getTime() <= Date.now();
 const subLabel = isPast
   ? t('widget.countdownSince', { label: fullLabel })
   : t('widget.countdownTo', { label: fullLabel });
+// 模式分支：过去态 → 年/月/天（纪念日）；未来态 → 天/时/分/秒（倒计时）
+const units = isPast ? ['y', 'm', 'd'] : ['d', 'h', 'm', 's'];
+const labels = isPast
+  ? (lang === 'en' ? ['Yrs', 'Mo', 'Days'] : ['年', '个月', '天'])
+  : (lang === 'en' ? ['Days', 'Hrs', 'Min', 'Sec'] : ['天', '时', '分', '秒']);
 ---
 {isValidTarget && (
 <section class="widget">
@@ -73,27 +77,63 @@ const subLabel = isPast
     if (!el) return;
     // target 已在服务端归一化为带 +08:00 的 ISO，本地解析即北京时间终点
     // isPast 由服务端按北京时间锚定判定（未来=倒计时 / 过去=纪念日）
-    var end = new Date(target).getTime();
+    var endMs = new Date(target).getTime();
     var past = isPast;
     // L-04 双保险：服务端已过滤非法目标，这里再判一次 NaN
-    // （NaN 参与比较恒为 false，会绕过 diff < 0 的钳制，直接把 NaN 写进 DOM）
-    if (!isFinite(end)) {
+    if (!isFinite(endMs)) {
       el.querySelectorAll('[data-cd]').forEach(function (n) { n.textContent = '--'; });
       return;
     }
-    function p2(n) { return String(n).padStart(2, '0'); }
+    function pad(n) { return String(n).padStart(2, '0'); }
+    // 按北京时间（Asia/Shanghai）取日历分量，与全站时区口径一致，避免本地时区导致跨月/跨年差 1
+    function shParts(date) {
+      var s = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+      var p = s.split('-');
+      return { y: +p[0], m: +p[1], d: +p[2] };
+    }
+    // 过去态：算 年/月/天（纪念日风格），处理借位与大小月
+    function ymd(from, to) {
+      var y = to.y - from.y, m = to.m - from.m, d = to.d - from.d;
+      if (d < 0) { m -= 1; d += new Date(to.y, to.m - 1, 0).getDate(); }
+      if (m < 0) { y -= 1; m += 12; }
+      return [y, m, d];
+    }
+    var endParts = shParts(new Date(target));
+    // 数字自适应：位数变多（如天数跨 1000）时缩小字号，防止顶破底色框
+    function fit() {
+      var nums = el.querySelectorAll('.cd-num');
+      nums.forEach(function (n) { n.style.fontSize = ''; });
+      nums.forEach(function (n) {
+        var cell = n.closest('.cd-cell');
+        if (!cell) return;
+        var avail = cell.clientWidth - 8;
+        if (n.scrollWidth > avail) {
+          var base = parseFloat(getComputedStyle(n).fontSize);
+          n.style.fontSize = (base * (avail / n.scrollWidth) * 0.98) + 'px';
+        }
+      });
+    }
     function tick() {
-      // 未来：终点 - 现在（倒计时，递减到 0）；过去：现在 - 终点（已过去，递增）
-      var diff = past ? (Date.now() - end) : (end - Date.now());
-      if (!isFinite(diff) || diff < 0) diff = 0;
-      var d = Math.floor(diff / 86400000);
-      var h = Math.floor((diff % 86400000) / 3600000);
-      var m = Math.floor((diff % 3600000) / 60000);
-      var s = Math.floor((diff % 60000) / 1000);
-      el.querySelector('[data-cd="d"]').textContent = d;
-      el.querySelector('[data-cd="h"]').textContent = p2(h);
-      el.querySelector('[data-cd="m"]').textContent = p2(m);
-      el.querySelector('[data-cd="s"]').textContent = p2(s);
+      if (past) {
+        // 过去态：年 / 月 / 天（纪念日），按北京时间日历计算
+        var parts = ymd(endParts, shParts(new Date()));
+        el.querySelector('[data-cd="y"]').textContent = parts[0];
+        el.querySelector('[data-cd="m"]').textContent = parts[1];
+        el.querySelector('[data-cd="d"]').textContent = parts[2];
+      } else {
+        // 未来态：天 / 时 / 分 / 秒（倒计时，递减到 0）
+        var diff = endMs - Date.now();
+        if (!isFinite(diff) || diff < 0) diff = 0;
+        var d = Math.floor(diff / 86400000);
+        var h = Math.floor((diff % 86400000) / 3600000);
+        var m = Math.floor((diff % 3600000) / 60000);
+        var s = Math.floor((diff % 60000) / 1000);
+        el.querySelector('[data-cd="d"]').textContent = d;
+        el.querySelector('[data-cd="h"]').textContent = pad(h);
+        el.querySelector('[data-cd="m"]').textContent = pad(m);
+        el.querySelector('[data-cd="s"]').textContent = pad(s);
+      }
+      fit();
     }
     tick();
     var timer = setInterval(tick, 1000);
