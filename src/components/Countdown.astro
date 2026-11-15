@@ -42,6 +42,12 @@ const dateStr = fmtDate(target, lang);
 // 非法则整块不渲染，避免页面上出现「NaN 天 NaN 时」和一个永远在跑的定时器。
 const isValidTarget = !!tzTarget && !Number.isNaN(new Date(tzTarget).getTime());
 const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
+// 模式自动判定：目标时刻已过去 → 纪念日（展示已过去天数）；否则 → 倒计时。
+// 沿用北京时间锚定（target 已归一化为 +08:00），与现有设计口径一致。
+const isPast = isValidTarget && new Date(tzTarget).getTime() <= Date.now();
+const subLabel = isPast
+  ? t('widget.countdownSince', { label: fullLabel })
+  : t('widget.countdownTo', { label: fullLabel });
 ---
 {isValidTarget && (
 <section class="widget">
@@ -49,7 +55,7 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
     <Icon name="clock" size={15} /> {t('widget.countdown')}
     <span class="countdown-tz">{t('widget.countdownTz')}</span>
   </h4>
-  <p class="countdown-label">{t('widget.countdownTo', { label: fullLabel })}</p>
+  <p class="countdown-label">{subLabel}</p>
   <div class="countdown-grid" id="countdown">
     {units.map((u, i) => (
       <div class="cd-cell">
@@ -61,12 +67,14 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
 </section>
 )}
 
-<script define:vars={{ target: tzTarget }}>
+<script define:vars={{ target: tzTarget, isPast }}>
   (function () {
     var el = document.getElementById('countdown');
     if (!el) return;
     // target 已在服务端归一化为带 +08:00 的 ISO，本地解析即北京时间终点
+    // isPast 由服务端按北京时间锚定判定（未来=倒计时 / 过去=纪念日）
     var end = new Date(target).getTime();
+    var past = isPast;
     // L-04 双保险：服务端已过滤非法目标，这里再判一次 NaN
     // （NaN 参与比较恒为 false，会绕过 diff < 0 的钳制，直接把 NaN 写进 DOM）
     if (!isFinite(end)) {
@@ -75,7 +83,8 @@ const fullLabel = name ? `${name}（${dateStr}）` : dateStr;
     }
     function p2(n) { return String(n).padStart(2, '0'); }
     function tick() {
-      var diff = end - Date.now();
+      // 未来：终点 - 现在（倒计时，递减到 0）；过去：现在 - 终点（已过去，递增）
+      var diff = past ? (Date.now() - end) : (end - Date.now());
       if (!isFinite(diff) || diff < 0) diff = 0;
       var d = Math.floor(diff / 86400000);
       var h = Math.floor((diff % 86400000) / 3600000);
