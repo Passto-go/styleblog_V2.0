@@ -125,7 +125,7 @@ const clarityOn = !!(analyticsCfg.clarity && analyticsCfg.clarity.enabled && ana
               <li><strong>处理限度</strong>：不记录浏览轨迹、不建立个人档案、不与访客的其他访问数据关联、不向第三方提供（统计服务的独立处理见第六节）。</li>
               <li><strong>可见性</strong>：透明度较低，正常阅读不易察觉，不影响页面的点击与选中操作。</li>
             </ul>
-            <p>访客如不希望显示该水印，可通过浏览器扩展屏蔽对应页面元素，或以无痕模式访问。本站不依赖水印实现任何功能，屏蔽后不影响内容阅读。</p>
+            <p>访客如不希望显示该水印，可通过浏览器扩展屏蔽对应页面元素。本站不依赖水印实现任何功能，屏蔽后不影响内容阅读；水印随页面始终渲染，切换无痕或隐私模式并不会使其消失。</p>
 
             <h2 id="cookies">四、Cookie 与浏览器本地存储</h2>
             {gaOn || clarityOn ? (
@@ -316,7 +316,7 @@ const clarityOn = !!(analyticsCfg.clarity && analyticsCfg.clarity.enabled && ana
               <li><strong>Limits of processing</strong>: no browsing history is recorded, no personal profile is created, the label is not linked to other access data, and it is not provided to third parties (analytics services are addressed separately in Section 6).</li>
               <li><strong>Visibility</strong>: opacity is low, so it is not readily apparent during normal reading and does not interfere with clicking or text selection.</li>
             </ul>
-            <p>Visitors who prefer not to see the watermark may hide the element with a browser extension or browse in private mode. No functionality depends on the watermark, and hiding it does not affect access to content.</p>
+            <p>Visitors who prefer not to see the watermark may hide the element with a browser extension. No functionality depends on the watermark, and hiding it does not affect access to content; the watermark is rendered with the page and persists regardless of private or incognito mode.</p>
 
             <h2 id="cookies">4. Cookies and local storage</h2>
             {gaOn || clarityOn ? (
