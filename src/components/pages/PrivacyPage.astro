@@ -251,7 +251,7 @@ const clarityOn = !!(analyticsCfg.clarity && analyticsCfg.clarity.enabled && ana
 
             <h2 id="crossborder">九、跨境传输与未成年人</h2>
             <ul>
-              <li>本站数据存储于境外云服务（Supabase 与 Cloudflare 的全球节点）。如访客同意加载 Google Analytics，相关统计数据将传至 Google（美国）。</li>
+              <li>本站数据存储于境外云服务（Supabase 与 Cloudflare 的全球节点）。{gaOn && '如后台启用且访客同意加载 Google Analytics，相关统计数据将传至 Google（美国）。'}{clarityOn && '如后台启用且访客同意加载 Microsoft Clarity，相关使用数据将传至 Microsoft（美国）。'}{!gaOn && !clarityOn && '本站当前未启用可选的第三方统计服务，不会因统计而向第三方传输数据。'}</li>
               <li>上述数据可能在访客所在国家或地区之外处理。</li>
               <li>本站为个人内容站点，不面向未成年人定向收集信息，亦不主动收集任何人的敏感个人信息（如身份证件号码、生物识别信息、精确地理位置等）。</li>
               <li>不满 14 周岁的未成年人，应在监护人同意后使用评论功能；站长获悉相关信息系未经监护人同意而收集时，将予以删除。</li>
@@ -442,7 +442,7 @@ const clarityOn = !!(analyticsCfg.clarity && analyticsCfg.clarity.enabled && ana
 
             <h2 id="crossborder">9. Cross-border transfers and minors</h2>
             <ul>
-              <li>Data is stored on cloud services outside mainland China (Supabase and Cloudflare global nodes). Where the visitor consents to Google Analytics, related analytics data is also transferred to Google (United States).</li>
+              <li>Data is stored on cloud services outside mainland China (Supabase and Cloudflare global nodes). {gaOn && 'Where Google Analytics is enabled in the admin panel and the visitor consents, related analytics data is transferred to Google (United States). '}{clarityOn && 'Where Microsoft Clarity is enabled in the admin panel and the visitor consents, related usage data is transferred to Microsoft (United States). '}{!gaOn && !clarityOn && 'No optional third-party analytics are currently enabled, so no data is transferred to third parties for analytics.'}</li>
               <li>Such data may be processed outside the visitor's country or region.</li>
               <li>This is a personal content site. It does not collect information from minors in a targeted manner, and does not collect sensitive personal information (such as identity document numbers, biometric data, or precise location).</li>
               <li>Minors under the age of 14 should use the comment function only with the consent of a guardian. Where the site owner learns that such information was collected without guardian consent, it will be deleted.</li>
